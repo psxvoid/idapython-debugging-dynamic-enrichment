@@ -85,6 +85,9 @@ for i in range(start_addr, end_addr + 1, 8):
     is_func_name_to_exclude = len(exclude_func_name_matches) > 0
     has_prefix = sub_index > -1
 
+    # TODO: 'ask' for it
+    skip_bad_prefixes = True
+
     if is_default_func_name:
         # do nothing, func_name is the default one
         pass
@@ -92,7 +95,10 @@ for i in range(start_addr, end_addr + 1, 8):
         continue
     elif sub_index > 0:
         # we want to replace wrongParentBase_sub_1401536C0 with CorrectClass::sub_1401536C0
-        func_name = func_name[sub_index:]
+        if skip_bad_prefixes:
+            continue
+        else:
+            func_name = func_name[sub_index:]
     else:
         # it's a custom name, skip it
         continue

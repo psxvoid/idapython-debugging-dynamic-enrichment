@@ -2,9 +2,12 @@ import idaapi
 import idautils
 import idc
 
+# needed for regexp [a3e1bcd6]
+import re
+
 
 # Ask for a prefix that will be added to subs in the specified range
-func_prefix = idc.AskStr("vftable", "Enter a prefix that will be added to subs")
+func_prefix = idc.AskStr("MyClass::", "Enter a prefix that will be added to subs")
 
 # [[441b119f]]
 # Asks for a start address of a vftable. Function names in this range (start_addr-end_addr) will be renamed.
@@ -51,9 +54,50 @@ for i in range(start_addr, end_addr + 1, 8):
     # 
     func_name = idc.GetFunctionName(func_addr)
 
-    # TODO: skip if the prefix isn't sub_XXX
-    new_name = func_prefix + func_name
+    # [[a3e1bcd6]]
+    # Match default names for subs\nullsubs
+    # ----------------------------------------------------------------------------------------
+    # Examples of default names:
+    #   nullsub_4774
+    #   nullsub_56
+    #   sub_14006AD20
+    # ----------------------------------------------------------------------------------------
+    # Example 1:
+    # result = re.findall(r'^sub_[0-9a-fA-F]{9,9}$','sub_1401529F0')
+    # len(result)
+    #
+    # Output:
+    # ['sub_1401529F0']
+    # 1
+    default_func_name_matches = re.findall(r'^(sub_[0-9a-fA-F]{9,9}$|nullsub_[0-9a-fA-F]{2,4})', func_name)
+    
+    # exclude __purecall for renaming
+    exclude_func_name_matches = re.findall(r'purecall', func_name)
 
+    # Find already renamed functions. Sometimes you name then for wrong base class.
+    # Example:
+    # wrongParentBase_sub_1401536C0
+    sub_index = func_name.find('nullsub_')
+    if sub_index == -1:
+        sub_index = func_name.find('sub_')
+
+    is_default_func_name = len(default_func_name_matches) > 0
+    is_func_name_to_exclude = len(exclude_func_name_matches) > 0
+    has_prefix = sub_index > -1
+
+    if is_default_func_name:
+        # do nothing, func_name is the default one
+        pass
+    elif is_func_name_to_exclude:
+        continue
+    elif sub_index > 0:
+        # we want to replace wrongParentBase_sub_1401536C0 with CorrectClass::sub_1401536C0
+        func_name = func_name[sub_index:]
+    else:
+        # it's a custom name, skip it
+        continue
+
+    new_name = func_prefix + func_name
     idc.MakeName(func_addr, new_name)
 
 

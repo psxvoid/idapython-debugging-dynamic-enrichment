@@ -7,6 +7,9 @@ class BGSInventoryItem():
         self.addr = addr
         self.form = idc.Qword(addr + BGSInventoryItem.Offset.form.value)
         self.stack = idc.Qword(addr + BGSInventoryItem.Offset.stack.value)
+    
+    def __repr__(self):
+        return "<BGSInventoryItem at 0x%X, TESForm: 0x%X, Stack: 0x%X>" % (self.addr, self.form, self.stack)
 
     class Offset(Enum):
         form = 0

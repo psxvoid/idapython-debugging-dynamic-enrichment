@@ -3,6 +3,11 @@ from aenum import Enum
 
 
 class BGSInventoryItem():
+    def __init__(self, addr):
+        self.addr = addr
+        self.form = idc.Qword(addr + BGSInventoryItem.Offset.form.value)
+        self.stack = idc.Qword(addr + BGSInventoryItem.Offset.stack.value)
+
     class Offset(Enum):
         form = 0
         stack = 8
@@ -12,7 +17,13 @@ class TArray():
         self.addr = t_array_addr
         self.Capacity = idc.Dword(t_array_addr + TArray.Offset.Capacity.value)
         self.Count = idc.Dword(t_array_addr + TArray.Offset.Count.value)
-        self.Entries = idc.Qword(t_array_addr + TArray.Offset.Entries.value)
+        
+        if (self.Count <= 0):
+            self.Entries = []
+            return
+
+        entriesStartAddr = idc.Qword(t_array_addr + TArray.Offset.Entries.value)
+        self.Entries = [BGSInventoryItem(i) for i in range(entriesStartAddr, entriesStartAddr + 16 * self.Count, 16)]
 
     class Offset(Enum):
         Entries = 0 # heap array of T

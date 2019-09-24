@@ -13,3 +13,4 @@ if addr is None:
 tor = tes_object_refr_functions.TESObjectREFR(addr)
 
 print("Items Count: %s" % tor.InventoryItems.Items.Count)
+print("Elements Count: %s" % len(tor.InventoryItems.Items.Entries))

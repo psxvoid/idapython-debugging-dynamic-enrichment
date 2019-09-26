@@ -15,5 +15,10 @@ tor = tes_object_refr_functions.TESObjectREFR(addr)
 print("Items Count: %s" % tor.InventoryItems.Items.Count)
 print("Elements Count: %s" % len(tor.InventoryItems.Items.Entries))
 
+print("BGSInventoryItems:")
 for i in tor.InventoryItems.Items.Entries:
     print(i)
+
+print("BGSInventoryItems Names:")
+for i in tor.InventoryItems.Items.Entries:
+    print(i.getName())

@@ -176,7 +176,7 @@ class BGSInventoryItem():
         #         if extraTextDisplayData is not None:
         #             return
         # TODO: move to a separate library file
-        dynamic_cast = idaapi.Appcall.proto("msvcrt___RTDynamicCast", "PVOID __fastcall __RTDynamicCast (PVOID inptr, LONG VfDelta, PVOID SrcType, PVOID TargetType, BOOL isReference);")
+        dynamic_cast = idaapi.Appcall.proto("msvcrt__RTDynamicCast", "PVOID __fastcall __RTDynamicCast (PVOID inptr, LONG VfDelta, PVOID SrcType, PVOID TargetType, BOOL isReference);")
 
         tes_full_name_ptr = dynamic_cast(self.form.addr, 0, 0x00000001436CB140, 0x00000001436CE220, 0).value
 

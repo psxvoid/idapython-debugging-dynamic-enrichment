@@ -3,9 +3,19 @@ import idaapi
 
 from aenum import Enum
 
+ptrSize = 8
+pdbg = False
+
 class MemObject(object):
     def __init__(self, addr):
         self.addr = addr
+
+class NullObject(object):
+    def __init__(self, *args, **kwargs):
+        super(NullObject, self).__init__(*args, **kwargs)
+
+def RVA(rva_addr):
+    return idaapi.get_imagebase() + rva_addr
 
 class BSExtraData(MemObject):
     def __init__(self, addr):
@@ -147,13 +157,13 @@ class BGSInventoryItem():
         self.stack = Stack(idc.Qword(addr + BGSInventoryItem.Offset.stack.value))
     
     def __repr__(self):
-        return "<BGSInventoryItem at 0x%X, TESForm: 0x%X, Stack: 0x%X>" % (self.addr, self.form.addr, self.stack.addr)
+        return "<BGSInventoryItem at 0x%X, TESForm: 0x%X, Stack: 0x%X, Name: %s>" % (self.addr, self.form.addr, self.stack.addr, self.getName(12))
 
     class Offset(Enum):
         form = 0
         stack = 8
 
-    def getName(self):
+    def getName(self, max_length=None):
         itemName = None
         # this block can be completely replaced with:
         #itemName = idc.GetString(Appcall.proto("TESFullName::possibly_getItemFullNameValue", "PVOID __fastcall TESFullName::possibly_getItemFullNameValue (PVOID inptr);")(0x0000000103C3BAB8).value)
@@ -175,9 +185,12 @@ class BGSInventoryItem():
             strAddr = get_full_name_cstr(tes_full_name_ptr).value
             if strAddr != 0:
                 itemName = idc.GetString(strAddr)
+                if itemName is not None:
+                    if max_length is not None:
+                        itemName = (itemName[:12] + '..') if len(itemName) > 75 else itemName
 
         if itemName is None:
-            itemName = '<unable_to_get_item_name>'
+            itemName = '<unknown>'
         return itemName
 
 class TArray():
@@ -213,3 +226,131 @@ class TESObjectREFR():
 
     class Offset(Enum):
         InventoryList = 0xF8
+
+class VFTable(MemObject):
+    def __init__(self, addr):
+        super(VFTable, self).__init__(addr)
+
+        ptrRTTICol = self.addr + VFTable.Offset.RTTICompleteObjectLocator.value
+        rttiCOL = idc.Qword(ptrRTTICol)
+        if pdbg: print("COLp: 0x%X" % (ptrRTTICol))
+        if pdbg: print("COL : 0x%X" % (rttiCOL))
+        self.RTTICompleteObjectLocator = RTTICompleteObjectLocator(rttiCOL)
+        # if self.RTTICompleteObjectLocator is not None:
+
+        # short names
+        self.col = self.RTTICompleteObjectLocator
+
+    def __repr__(self):
+        name = self.RTTICompleteObjectLocator.RTTITypeDescriptor.name
+        return "<VFTable at 0x%X, COL: 0x%X, Name: %s>" % (self.addr, self.RTTICompleteObjectLocator.addr, name)
+    
+    class Offset(Enum):
+        RTTICompleteObjectLocator = - 0x8   # 0x8
+
+class RTTICompleteObjectLocator(MemObject):
+    def __init__(self, addr):
+        super(RTTICompleteObjectLocator, self).__init__(addr)
+        
+        self.thisOffset = idc.Dword(self.addr + RTTICompleteObjectLocator.Offset.this.value)
+        self.ctorDisplacement = idc.Dword(self.addr + RTTICompleteObjectLocator.Offset.ctorDisplacement.value)
+        descriptorAddr = RVA(idc.Dword(self.addr + RTTICompleteObjectLocator.Offset.rvaTypeDescriptor.value))
+        if pdbg: print("RTD: 0x%X" % (descriptorAddr))
+        self.RTTITypeDescriptor = RTTITypeDescriptor(descriptorAddr)
+        hierarchyAddr = RVA(idc.Dword(self.addr + RTTICompleteObjectLocator.Offset.rvaTypeHierarchy.value))
+        if pdbg: print("RTH: 0x%X" % (hierarchyAddr))
+        self.RTTITypeHierarchy = RTTIClassHierarchyDescriptor(hierarchyAddr)
+        # self.ObjectBase
+
+        #short names
+        self.rtd = self.RTTITypeDescriptor
+        self.rth = self.RTTITypeHierarchy
+
+    class Offset(Enum):
+        signature           = 0x00  # 0x4
+        this                = 0x04  # 0x4
+        ctorDisplacement    = 0x08  # 0x4
+        rvaTypeDescriptor   = 0x0C  # 0x4
+        rvaTypeHierarchy    = 0x10  # 0x4
+        rvaObjectBase       = 0x14  # 0x4
+
+class RTTITypeDescriptor(MemObject):
+    def __init__(self, addr):
+        super(RTTITypeDescriptor, self).__init__(addr)
+        nameAddr = addr + RTTITypeDescriptor.Offset.mangledName.value + RTTITypeDescriptor.NameOffset.classPrefix.value
+        if pdbg: print("NAM: 0x%X" % (nameAddr))
+        self.mangledName = idc.GetString(nameAddr)
+        demangledName = idc.Demangle('??_7' + self.mangledName + '6B@', 8)
+        if demangledName != None:
+            demangledName = demangledName[0:len(demangledName)-11]
+        self.name = demangledName
+
+    def __repr__(self):
+        return "<RTTITypeDescriptor at 0x%X, NAM: %s>" % (self.addr, self.name)
+
+    class Offset(Enum):
+        typeInfo            = 0x00  # 0x8
+        internalRuntimeRef  = 0x08  # 0x8
+        mangledName         = 0x10
+
+    class NameOffset(Enum):
+        classPrefix         = 0x4   # skips "class" prefix
+
+class RTTIClassHierarchyDescriptor(MemObject):
+    def __init__(self, addr):
+        super(RTTIClassHierarchyDescriptor, self).__init__(addr)
+
+        signatureAddr = addr + RTTIClassHierarchyDescriptor.Offset.signature.value
+        attributesAddr = addr + RTTIClassHierarchyDescriptor.Offset.attributes.value
+        numberOfItemsAddr = addr + RTTIClassHierarchyDescriptor.Offset.numberOfItems.value
+        baseClassHierarchyArr = RVA(idc.Dword(addr + RTTIClassHierarchyDescriptor.Offset.rvaBaseClassArrRef.value))
+
+        if pdbg: print("BCA: 0x%X" % (baseClassHierarchyArr))
+
+        self.signature = idc.Dword(signatureAddr)
+        self.attributes = idc.Dword(attributesAddr)
+        self.numberOfItems = idc.Dword(numberOfItemsAddr)
+        self.baseClassHierarchyArray = baseClassHierarchyArr
+
+    def __repr__(self):
+        return "<RTTITypeHierarchy at 0x%X, SIG: 0x%X, ATT: 0x%X, NUM: 0x%X>" % (self.addr, self.signature, self.attributes, self.numberOfItems)
+
+    def printChildren(self):
+        print("Children:")
+        # iterate over Base Class Array
+        for i in range(0, self.numberOfItems):
+            baseClassDescriptorAddr = RVA(idc.Dword(self.baseClassHierarchyArray + i * 4))
+            baseClassDescriptor = RTTIBaseClassDescriptor(baseClassDescriptorAddr)
+            print(" - %s" % (baseClassDescriptor.typeDescriptor))
+
+    class Offset(Enum):
+        signature          = 0x00  # 0x4
+        attributes         = 0x04  # 0x4
+        numberOfItems      = 0x08  # 0x4
+        rvaBaseClassArrRef = 0x0C  # 0x4
+
+class RTTIBaseClassDescriptor(MemObject):
+    def __init__(self, addr):
+        super(RTTIBaseClassDescriptor, self).__init__(addr)
+        typeDescriptorAddr = RVA(idc.Dword(addr + RTTIBaseClassDescriptor.Offset.rvaTypeDescriptor.value))
+        classHierarchyAddr = RVA(idc.Dword(addr + RTTIBaseClassDescriptor.Offset.rvaClassHierarchy.value))
+
+        if pdbg: print("BCD : %X" % (typeDescriptorAddr))
+        if pdbg: print("BCHD: %X" % (classHierarchyAddr))
+
+        self.typeDescriptor = RTTITypeDescriptor(typeDescriptorAddr)
+        self.numberOfSubElements = idc.Dword(addr + RTTIBaseClassDescriptor.Offset.numOfSubElements.value)
+        self.memberDisplacement = idc.Dword(addr + RTTIBaseClassDescriptor.Offset.memberDisplacement.value)
+        self.vftableDisplacement = idc.Dword(addr + RTTIBaseClassDescriptor.Offset.vftableDisplacement.value)
+        self.displacementWithinVFTable = idc.Dword(addr + RTTIBaseClassDescriptor.Offset.displacementWithinVFTable.value)
+        self.baseClassAttributes = idc.Dword(addr + RTTIBaseClassDescriptor.Offset.baseClassAttributes.value)
+        self.classHierarchy = classHierarchyAddr
+
+    class Offset(Enum):
+        rvaTypeDescriptor           = 0x00 # 0x4
+        numOfSubElements            = 0x04 # 0x4
+        memberDisplacement          = 0x08 # 0x4
+        vftableDisplacement         = 0x0C # 0x4
+        displacementWithinVFTable   = 0x10 # 0x4
+        baseClassAttributes         = 0x14 # 0x4
+        rvaClassHierarchy           = 0x18 # 0x4

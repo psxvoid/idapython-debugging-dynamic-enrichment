@@ -6,6 +6,20 @@ from aenum import Enum
 ptrSize = 8
 pdbg = False
 
+def hasChildrenOfType(classHierarchyDescriptor, typeName):
+    repr(classHierarchyDescriptor)
+    if classHierarchyDescriptor.hasChildren():
+        children = classHierarchyDescriptor.getChildren()
+        for child in children:
+            # child = RTTIBaseClassDescriptor
+            if child.typeDescriptor.name == typeName:
+                return True
+            else:
+                if child.hasChildren():
+                    return hasChildrenOfType(child.classHierarchyDescriptor, typeName)
+                return False
+    return False
+
 class MemObject(object):
     def __init__(self, addr):
         self.addr = addr
@@ -211,18 +225,24 @@ class TArray():
         Capacity = 0x8
         Count = 0x10
 
-class BGSInventoryList():
-    def __init__(self, inventory_list_addr):
-        self.addr = inventory_list_addr
-        self.Items = TArray(inventory_list_addr + BGSInventoryList.Offset.Items.value)
+class BGSInventoryList(MemObject):
+    def __init__(self, addr):
+        super(BGSInventoryList, self).__init__(addr)
+        self.Items = TArray(addr + BGSInventoryList.Offset.Items.value)
+        self.weight = idc.GetFloat(addr + BGSInventoryList.Offset.Weight.value)
 
     class Offset(Enum):
-        Items = 0x58 # TArray<BGSInventoryItem>
+        Items   = 0x58 # TArray<BGSInventoryItem>
+        Weight  = 0x70 # float (4 bytes)
 
-class TESObjectREFR():
-    def __init__(self, tes_object_refr_addr):
-        self.addr = tes_object_refr_addr
-        self.InventoryItems = BGSInventoryList(idc.Qword(tes_object_refr_addr + TESObjectREFR.Offset.InventoryList.value))
+class TESObjectREFR(MemObject):
+    def __init__(self, addr):
+        super(TESObjectREFR, self).__init__(addr)
+        self.InventoryItems = BGSInventoryList(idc.Qword(addr + TESObjectREFR.Offset.InventoryList.value))
+    
+    def __repr__(self):
+        name = VFTable(idc.Qword(self.addr)).RTTICompleteObjectLocator.RTTITypeDescriptor.name
+        return "<TESObjectREFR at 0x%X, BGSInventoryList: 0x%X, Type:%s>" % (self.addr, self.InventoryItems.addr, name)
 
     class Offset(Enum):
         InventoryList = 0xF8
@@ -259,12 +279,12 @@ class RTTICompleteObjectLocator(MemObject):
         self.RTTITypeDescriptor = RTTITypeDescriptor(descriptorAddr)
         hierarchyAddr = RVA(idc.Dword(self.addr + RTTICompleteObjectLocator.Offset.rvaTypeHierarchy.value))
         if pdbg: print("RTH: 0x%X" % (hierarchyAddr))
-        self.RTTITypeHierarchy = RTTIClassHierarchyDescriptor(hierarchyAddr)
+        self.RTTIClassHierarchyDescriptor = RTTIClassHierarchyDescriptor(hierarchyAddr)
         # self.ObjectBase
 
         #short names
         self.rtd = self.RTTITypeDescriptor
-        self.rth = self.RTTITypeHierarchy
+        self.rhd = self.RTTIClassHierarchyDescriptor
 
     class Offset(Enum):
         signature           = 0x00  # 0x4
@@ -315,13 +335,24 @@ class RTTIClassHierarchyDescriptor(MemObject):
     def __repr__(self):
         return "<RTTITypeHierarchy at 0x%X, SIG: 0x%X, ATT: 0x%X, NUM: 0x%X>" % (self.addr, self.signature, self.attributes, self.numberOfItems)
 
+    def getChildren(self):
+        # iterate over Base Class Array
+        children = []
+        # 0-th child is reference to self
+        for i in range(1, self.numberOfItems + 1):
+            baseClassDescriptorAddr = RVA(idc.Dword(self.baseClassHierarchyArray + i * 4))
+            baseClassDescriptor = RTTIBaseClassDescriptor(baseClassDescriptorAddr)
+            children.append(baseClassDescriptor)
+        return children
+
     def printChildren(self):
         print("Children:")
         # iterate over Base Class Array
-        for i in range(0, self.numberOfItems):
-            baseClassDescriptorAddr = RVA(idc.Dword(self.baseClassHierarchyArray + i * 4))
-            baseClassDescriptor = RTTIBaseClassDescriptor(baseClassDescriptorAddr)
+        for baseClassDescriptor in self.getChildren():
             print(" - %s" % (baseClassDescriptor.typeDescriptor))
+
+    def hasChildren(self):
+        return self.numberOfItems > 0
 
     class Offset(Enum):
         signature          = 0x00  # 0x4
@@ -344,7 +375,13 @@ class RTTIBaseClassDescriptor(MemObject):
         self.vftableDisplacement = idc.Dword(addr + RTTIBaseClassDescriptor.Offset.vftableDisplacement.value)
         self.displacementWithinVFTable = idc.Dword(addr + RTTIBaseClassDescriptor.Offset.displacementWithinVFTable.value)
         self.baseClassAttributes = idc.Dword(addr + RTTIBaseClassDescriptor.Offset.baseClassAttributes.value)
-        self.classHierarchy = classHierarchyAddr
+        self.classHierarchyDescriptor = RTTIClassHierarchyDescriptor(classHierarchyAddr)
+    
+    def __repr__(self):
+        return "<RTTIBaseClassDescriptor at 0x%X, RTD: 0x%X, NUM: 0x%s, MDS: 0x%s, VDS: 0x%s, DWV: 0x%s, BAT: 0x%X, BHD: 0x%X>" % (self.addr, self.typeDescriptor.addr, self.numberOfSubElements, self.memberDisplacement, self.vftableDisplacement, self.displacementWithinVFTable, self.baseClassAttributes, self.classHierarchyDescriptor.addr)
+
+    def hasChildren(self):
+        return self.numberOfSubElements > 0
 
     class Offset(Enum):
         rvaTypeDescriptor           = 0x00 # 0x4

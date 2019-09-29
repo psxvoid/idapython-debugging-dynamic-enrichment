@@ -1,8 +1,14 @@
 import idc
 import idaapi
 
-#from tes_object_refr_functions import *
 idaapi.require('tes_object_refr_functions')
+import tes_object_refr_functions
+tes = tes_object_refr_functions
+
+idaapi.require('.AnalyserBase', 'DDE.Analysers')
+from DDE.Analysers.AnalyserBase import AnalyserBase
+idaapi.require('.TESObjectAnalyser', 'DDE.Analysers')
+from DDE.Analysers.TESObjectAnalyser import TESObjectAnalyser
 
 pdbg = False
 pvrb = False
@@ -11,48 +17,50 @@ def scan_register(reg_str_name):
     regValue = idc.GetRegValue(reg_str_name)
     if pdbg: print("Reg scan: %s" % (reg_str_name))
     # TODO: iterate over scanners
-    scanner = AddressScanner_VFTable()
+    # scanners = AnalyserBase.__subclasses__()
+    scanners = [TESObjectAnalyser(), AddressScanner_VFTable()]
+    if pvrb: print("Found %s scanners." % (len(scanners)))
 
-    if pdbg: print("Reg Value: 0x%X" % (regValue))
-    try:
-        if scanner.getMatch(regValue):
-            print("%s is %s" % (reg_str_name.upper(), scanner.getScanMessage()))
-            return
-    except Exception as e:
-        if pdbg: print(e)
-        pass
+    for scanner in scanners:
+        if pdbg: print("Reg Value: 0x%X" % (regValue))
+        try:
+            if scanner.getMatch(regValue):
+                print("%s is %s" % (reg_str_name.upper(), scanner.getScanMessage()))
+                return
+        except Exception as e:
+            if pdbg: print(e)
+            pass
 
-    if pdbg: print("scanning ptr..")
+        if pdbg: print("scanning ptr..")
 
-    ptr = idc.Qword(regValue)
-    if pdbg: print("PTR0: 0x%X" % (ptr))
+        ptr = idc.Qword(regValue)
+        if pdbg: print("PTR0: 0x%X" % (ptr))
 
-    try:
-        if scanner.getMatch(ptr):
-            print("%s points to 0x%X -> %s" % (reg_str_name.upper(), ptr, scanner.getScanMessage()))
-            return
-    except Exception as e:
-        if pdbg: print(e)
-        pass
+        try:
+            if scanner.getMatch(ptr):
+                print("%s points to 0x%X -> %s" % (reg_str_name.upper(), ptr, scanner.getScanMessage()))
+                return
+        except Exception as e:
+            if pdbg: print(e)
+            pass
 
-    ptrPtr = idc.Qword(ptr)
-    if pdbg: print("PTR1: 0x%X" % (ptrPtr))
+        ptrPtr = idc.Qword(ptr)
+        if pdbg: print("PTR1: 0x%X" % (ptrPtr))
 
-    try:
-        if scanner.getMatch(ptrPtr):
-            print("%s points to 0x%X -> 0x%x -> %s" % (reg_str_name.upper(), ptr, ptrPtr, scanner.getScanMessage()))
-            return
-    except:
-        pass
+        try:
+            if scanner.getMatch(ptrPtr):
+                print("%s points to 0x%X -> 0x%x -> %s" % (reg_str_name.upper(), ptr, ptrPtr, scanner.getScanMessage()))
+                return
+        except:
+            pass
 
-
-class AddressScanner_VFTable(object):
+class AddressScanner_VFTable(AnalyserBase):
     def __init__(self, *args, **kwargs):
         super(AddressScanner_VFTable, self).__init__(*args, **kwargs)
     
     def getMatch(self, addr):
         try:
-            vftable = tes_object_refr_functions.VFTable(addr)
+            vftable = tes.VFTable(addr)
             name = vftable.RTTICompleteObjectLocator.RTTITypeDescriptor.name
             if (name is None) or (len(name) <= 0):
                 return False
@@ -62,10 +70,6 @@ class AddressScanner_VFTable(object):
         except Exception as e:
             if pdbg: print(e)
             return False
-
-    def getScanMessage(self):
-        return self.scanMessage
-
 
 x64registers = ['rax', 'rbx', 'rcx', 'rdx', 'rsi', 'rdi', 'rbp', 'rsp', 'r8', 'r9', 'r10', 'r11', 'r12', 'r13', 'r14', 'r15']
 

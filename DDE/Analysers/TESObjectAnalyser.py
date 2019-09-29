@@ -15,7 +15,14 @@ class TESObjectAnalyser(AnalyserBase):
         super(TESObjectAnalyser, self).__init__(*args, **kwargs)
 
     def getMatch(self, addr):
-        # TESObjectREFR
+        try:
+            tArray = tes.TArray(addr)
+            if tArray.count > 0 and tArray.capacity > 0 and tArray.count < tArray.capacity and tArray.count <= 10000:
+                self.getScanMessage = repr(tArray)
+                return True
+        except:
+            if pdbg: traceback.print_exc()
+
         try:
             vftable = tes.VFTable(idc.Qword(addr))
             type_name = "TESObjectREFR"

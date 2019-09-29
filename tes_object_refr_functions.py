@@ -207,18 +207,25 @@ class BGSInventoryItem():
             itemName = '<unknown>'
         return itemName
 
-class TArray():
-    def __init__(self, t_array_addr):
-        self.addr = t_array_addr
-        self.Capacity = idc.Dword(t_array_addr + TArray.Offset.Capacity.value)
-        self.Count = idc.Dword(t_array_addr + TArray.Offset.Count.value)
-        
-        if (self.Count <= 0):
-            self.Entries = []
-            return
+class TArray(MemObject):
+    def __init__(self, addr, t_type = None, t_size = None):
+        super(TArray, self).__init__(addr)
+        self.capacity = idc.Dword(addr + TArray.Offset.Capacity.value)
+        self.count = idc.Dword(addr + TArray.Offset.Count.value)
+        self.t_type = t_type
 
-        entriesStartAddr = idc.Qword(t_array_addr + TArray.Offset.Entries.value)
-        self.Entries = [BGSInventoryItem(i) for i in range(entriesStartAddr, entriesStartAddr + 16 * self.Count, 16)]
+        self.entriesAddr = idc.Qword(addr + TArray.Offset.Entries.value)
+        if t_type is None:
+            self.Entries = NullObject()
+        else:
+            if (self.count <= 0):
+                self.Entries = []
+                return
+            self.Entries = [t_type(i) for i in range(self.entriesAddr, self.entriesAddr + 16 * self.count, t_size)]
+
+    def __repr__(self):
+        type_name = "<unknown>" if self.t_type is None else self.t_type.__name__
+        return "<tArray at 0x%X, Entries: 0x%X, count: %s, capacity: %s, type: %s>" % (self.addr, self.entriesAddr, self.count, self.capacity, type_name)
 
     class Offset(Enum):
         Entries = 0 # heap array of T
@@ -228,7 +235,7 @@ class TArray():
 class BGSInventoryList(MemObject):
     def __init__(self, addr):
         super(BGSInventoryList, self).__init__(addr)
-        self.Items = TArray(addr + BGSInventoryList.Offset.Items.value)
+        self.Items = TArray(addr + BGSInventoryList.Offset.Items.value, BGSInventoryItem, 16)
         self.weight = idc.GetFloat(addr + BGSInventoryList.Offset.Weight.value)
 
     class Offset(Enum):

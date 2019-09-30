@@ -24,16 +24,29 @@ class TESObjectAnalyser(AnalyserBase):
             if pdbg: traceback.print_exc()
 
         try:
-            vftable = tes.VFTable(idc.Qword(addr))
+            inventoryItem = tes.BGSInventoryItem(addr, False)
+            formVFTable = inventoryItem.form.getVFTable(False)
+
+            type_name = "TESForm"
+            hasTESForm = tes.hasChildrenOfType(formVFTable.RTTICompleteObjectLocator.RTTIClassHierarchyDescriptor, type_name)
+
+            if hasTESForm & inventoryItem.stack.count > 0 and inventoryItem.stack.count < 20000:
+                self.scanMessage = repr(inventoryItem)
+                return True
+        except:
+            if pdbg: traceback.print_exc()
+
+        try:
+            vftable = tes.VFTable(idc.Qword(addr), False)
             type_name = "TESObjectREFR"
 
             isTESObjectREFRName = vftable.RTTICompleteObjectLocator.RTTITypeDescriptor.name == type_name
             hasTESObjectREFRSubClass = tes.hasChildrenOfType(vftable.RTTICompleteObjectLocator.RTTIClassHierarchyDescriptor, type_name)
 
             if isTESObjectREFRName or hasTESObjectREFRSubClass:
-                self.scanMessage = repr(tes.TESObjectREFR(addr))
+                self.scanMessage = repr(tes.TESObjectREFR(addr, False))
                 return True
-            return False
         except Exception as e:
             if pdbg: traceback.print_exc()
-            return False
+
+        return False

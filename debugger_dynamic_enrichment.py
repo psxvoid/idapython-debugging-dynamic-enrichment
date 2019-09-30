@@ -20,6 +20,5 @@ except:
         print(e)
     pass
 
-
 # Start debugging
 idaapi.run_requests()

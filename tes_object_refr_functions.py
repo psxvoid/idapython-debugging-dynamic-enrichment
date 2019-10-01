@@ -4,7 +4,6 @@ import traceback
 
 from aenum import Enum
 
-
 ptrSize = 8
 pdbg = False
 
@@ -48,6 +47,14 @@ class MemObject(object):
 
     def __repr__(self):
         return "<MemObject at 0x{:X}>".format(self.addr)
+
+    def __eq__(self, other):
+        if isinstance(other, MemObject):
+            return self.addr == other.addr
+        return False
+
+    def __ne__(self, other):
+        result = self.__eq__(other)
 
 class NullObject(object):
     def __init__(self, *args, **kwargs):

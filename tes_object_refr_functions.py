@@ -87,7 +87,7 @@ class BSExtraData(MemObject):
         return result
 
     def getTypeName(self):
-        return VFTable(idc.Qword(self.addr + self.Offset.vftable.value)).RTTICompleteObjectLocator.RTTITypeDescriptor.name
+        return VFTable(idc.Qword(self.addr + BSExtraData.Offset.vftable.value)).RTTICompleteObjectLocator.RTTITypeDescriptor.name
 
     def getExtraDataByType(self, extraDataType):
         flag = idc.Qword(self.addr + BSExtraData.Offset.field_10)
@@ -228,6 +228,7 @@ class Stack(MemObject):
         else:
             self.ExtraDataList = ExtraDataList(extraDataList)
         self.count = idc.Dword(addr + Stack.Offset.Count.value)
+        self.flags = idc.Byte(addr + Stack.Offset.Flags.value)
 
     def __repr__(self):
         stack = ConditionalFormat(self.NextStack)
@@ -259,10 +260,17 @@ class Stack(MemObject):
             deepness = deepness + 1
         return result
 
+    def isEquipped(self):
+        return self.flags & Stack.Flags.IsEquipped.value != 0
+
+    class Flags(Enum):
+        IsEquipped = 0x7
+
     class Offset(Enum):
         PtrNextStack        = 0x10
         PtrExtraDataList    = 0x18
         Count               = 0x20
+        Flags               = 0x24
 
 class BGSInventoryItem(MemObject):
     def __init__(self, addr, recursive = True, flat = False):

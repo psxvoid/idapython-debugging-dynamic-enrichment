@@ -194,9 +194,34 @@ class BaseFormComponent(MemObject):
 class TESForm(MemObject):
     def __init__(self, addr):
         super(TESForm, self).__init__(addr)
+        self.formType = idc.Byte(addr + TESForm.Offset.FormType.value)
+        self.flags = idc.Dword(addr + TESForm.Offset.Flags.value)
+        self.formId = idc.Dword(addr + TESForm.Offset.FormId.value)
 
     def getVFTable(self, recursive = True, flat = False):
         return VFTable(idc.Qword(self.addr), recursive, flat)
+    
+    def getName(self, max_length=None):
+        name = None
+        try:
+            name = idc.GetString(idaapi.Appcall.proto("TESFullName::possibly_getItemFullNameValue", "PVOID __fastcall TESFullName::possibly_getItemFullNameValue (PVOID inptr);")(self.addr).value)
+        except:
+            if pdbg: traceback.print_exc()
+
+        if name is None:
+            name = '<unknown>'
+
+        return name
+
+    def __repr__(self):
+        typeName = "<unknown>"
+        try:
+            vftable = self.getVFTable()
+            typeName = vftable.RTTICompleteObjectLocator.RTTITypeDescriptor.name
+        except:
+            if pdbg: traceback.print_exc()
+        
+        return "<TESForm at 0x{:X}, type: 0x{:X}, flags: 0x{:X}, formId: {:X} name: {}, typeName: {}>".format(self.addr, self.formType, self.flags, self.formId, self.getName(), typeName)
 
     class Offset(Enum):
         Flags = 0x10

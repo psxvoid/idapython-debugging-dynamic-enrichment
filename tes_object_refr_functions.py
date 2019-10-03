@@ -4,6 +4,9 @@ import traceback
 
 from aenum import Enum
 
+import DDE.IDAHelpers.addtrace
+at = DDE.IDAHelpers.addtrace
+
 ptrSize = 8
 pdbg = False
 
@@ -23,6 +26,21 @@ class ConditionalFormat(object):
 
     def __repr__(self):
         return "<ConditionalFormat format: %s, repr: %s>" % (self.format, self.repr)
+
+def addTraceTo(ea_or_mem_obj):
+    if issubclass(type(ea_or_mem_obj), BGSInventoryList):
+        print("Adding trace to BGSInventoryList...")
+        for item in ea_or_mem_obj.Items.Entries:
+           at.addReadWriteTrace(item.addr)
+        print("Done.")
+    elif issubclass(type(ea_or_mem_obj), MemObject):
+        print("Adding trace to MemObject...")
+        at.addReadWriteTrace(ea_or_mem_obj.addr)
+        print("Done.")
+    else:
+        print("Adding trace to address...")
+        at.addReadWriteTrace(ea_or_mem_obj)
+        print("Done.")
 
 max_deepness = 10
 def hasChildrenOfType(classHierarchyDescriptor, typeName, deepness = 1):

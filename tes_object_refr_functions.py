@@ -387,7 +387,12 @@ class BGSInventoryList(MemObject):
         self.weight = idc.GetFloat(addr + BGSInventoryList.Offset.Weight.value)
     
     def __repr__(self):
-        return "<BGSInventoryList at 0x%X, weight: %s, items: 0x%X>" % (self.addr, self.weight, self.Items.addr)
+        count = 0
+        try:
+            count = self.Items.count
+        except:
+            if pdbg: traceback.print_exc()
+        return "<BGSInventoryList at 0x%X, weight: %s, count: %s, items: 0x%X>" % (self.addr, self.weight, count, self.Items.addr)
 
     class Offset(Enum):
         Items   = 0x58 # TArray<BGSInventoryItem>

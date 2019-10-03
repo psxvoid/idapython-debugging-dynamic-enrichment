@@ -4,6 +4,7 @@ import idaapi
 import traceback
 
 import tes_object_refr_functions
+from DDE.IDAHelpers.timeout import exit_after
 
 from DDE.Analysers.AnalyserBase import AnalyserBase
 
@@ -13,7 +14,8 @@ pdbg = False
 class TESObjectAnalyser(AnalyserBase):
     def __init__(self, *args, **kwargs):
         super(TESObjectAnalyser, self).__init__(*args, **kwargs)
-
+    
+    @exit_after(2)
     def getMatch(self, addr):
         try:
             tArray = tes.TArray(addr)
@@ -24,8 +26,8 @@ class TESObjectAnalyser(AnalyserBase):
             if pdbg: traceback.print_exc()
 
         try:
-            inventoryItem = tes.BGSInventoryItem(addr, False)
-            formVFTable = inventoryItem.form.getVFTable(False)
+            inventoryItem = tes.BGSInventoryItem(addr)
+            formVFTable = inventoryItem.form.getVFTable()
 
             type_name = "TESForm"
             hasTESForm = tes.hasChildrenOfType(formVFTable.RTTICompleteObjectLocator.RTTIClassHierarchyDescriptor, type_name)
@@ -37,14 +39,14 @@ class TESObjectAnalyser(AnalyserBase):
             if pdbg: traceback.print_exc()
 
         try:
-            vftable = tes.VFTable(idc.Qword(addr), False)
+            vftable = tes.VFTable(idc.Qword(addr))
             type_name = "TESObjectREFR"
 
             isTESObjectREFRName = vftable.RTTICompleteObjectLocator.RTTITypeDescriptor.name == type_name
             hasTESObjectREFRSubClass = tes.hasChildrenOfType(vftable.RTTICompleteObjectLocator.RTTIClassHierarchyDescriptor, type_name)
 
             if isTESObjectREFRName or hasTESObjectREFRSubClass:
-                self.scanMessage = repr(tes.TESObjectREFR(addr, False))
+                self.scanMessage = repr(tes.TESObjectREFR(addr))
                 return True
         except Exception as e:
             if pdbg: traceback.print_exc()

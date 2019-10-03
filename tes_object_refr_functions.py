@@ -8,6 +8,8 @@ import DDE.IDAHelpers.addtrace
 at = DDE.IDAHelpers.addtrace
 
 ptrSize = 8
+max_deepness = 10
+max_hierarchy_deepness = 45
 pdbg = False
 
 class ConditionalFormat(object):
@@ -27,11 +29,11 @@ class ConditionalFormat(object):
     def __repr__(self):
         return "<ConditionalFormat format: %s, repr: %s>" % (self.format, self.repr)
 
-def addTraceTo(ea_or_mem_obj):
+def addTraceTo(ea_or_mem_obj, bpt_size = 1):
     if issubclass(type(ea_or_mem_obj), BGSInventoryList):
         print("Adding trace to BGSInventoryList...")
         for item in ea_or_mem_obj.Items.Entries:
-           at.addReadWriteTrace(item.addr)
+           at.addReadWriteTrace(item.addr, bpt_size)
         print("Done.")
     elif issubclass(type(ea_or_mem_obj), MemObject):
         print("Adding trace to MemObject...")
@@ -39,14 +41,13 @@ def addTraceTo(ea_or_mem_obj):
         print("Done.")
     else:
         print("Adding trace to address...")
-        at.addReadWriteTrace(ea_or_mem_obj)
+        at.addReadWriteTrace(ea_or_mem_obj, bpt_size)
         print("Done.")
 
-max_deepness = 10
-def hasChildrenOfType(classHierarchyDescriptor, typeName, deepness = 1):
-    if deepness >= max_deepness: return False
+def hasChildrenOfType(classHierarchyDescriptor, typeName, deepness = 0):
+    if deepness >= max_hierarchy_deepness: return False
     if classHierarchyDescriptor.hasChildren():
-        children = classHierarchyDescriptor.getChildren()
+        children = classHierarchyDescriptor.getChildren(max_hierarchy_deepness)
         for child in children:
             # child = RTTIBaseClassDescriptor
             if child.typeDescriptor.name == typeName:
@@ -58,10 +59,9 @@ def hasChildrenOfType(classHierarchyDescriptor, typeName, deepness = 1):
     return False
 
 class MemObject(object):
-    def __init__(self, addr, recursive = True, flat = False):
+    def __init__(self, addr, deepness = 0):
         self.addr = addr
-        self.isRecursive = recursive
-        self.isFlat = flat
+        self.deepness = deepness
 
     def __repr__(self):
         return "<MemObject at 0x{:X}>".format(self.addr)
@@ -85,8 +85,8 @@ def RVA(rva_addr):
     return idaapi.get_imagebase() + rva_addr
 
 class BSExtraData(MemObject):
-    def __init__(self, addr):
-        super(BSExtraData, self).__init__(addr)
+    def __init__(self, addr, deepness = 0):
+        super(BSExtraData, self).__init__(addr, deepness)
         self.Next = idc.Qword(addr + BSExtraData.Offset.PtrNext.value)
         self.Type = idc.Byte(addr + BSExtraData.Offset.Type.value)
 
@@ -99,7 +99,7 @@ class BSExtraData(MemObject):
             if current.Next == 0:
                 break
             deepness = deepness + 1
-            nextExtra = BSExtraData(current.Next)
+            nextExtra = BSExtraData(current.Next, self.deepness + 1)
             result.append(nextExtra)
             current = nextExtra
         return result
@@ -138,8 +138,8 @@ class BSExtraData(MemObject):
         Type        = 0x12
 
 class StringCache(MemObject):
-    def __init__(self, addr):
-        super(StringCache, self).__init__(addr)
+    def __init__(self, addr, deepness = 0):
+        super(StringCache, self).__init__(addr, deepness)
 
     class Entry(object):
         class Offset(Enum):
@@ -155,8 +155,8 @@ class StringCache(MemObject):
 BSFixedString = StringCache.Entry
 
 class ExtraTextDisplayData(BSExtraData):
-    def __init__(self, addr):
-        super(ExtraTextDisplayData, self).__init__(addr)
+    def __init__(self, addr, deepness = 0):
+        super(ExtraTextDisplayData, self).__init__(addr, deepness)
 
     class Offset(Enum):
         Name                = 0x18
@@ -167,19 +167,22 @@ class ExtraTextDisplayData(BSExtraData):
         NameLength          = 0x40
 
 class ExtraDataList(MemObject):
-    def __init__(self, addr):
-        super(ExtraDataList, self).__init__(addr)
-        extraData = idc.Qword(addr + ExtraDataList.Offset.PtrBSExtraData.value)
-        if extraData == 0:
+    def __init__(self, addr, deepness = 0):
+        super(ExtraDataList, self).__init__(addr, deepness)
+        extraDataAddr = idc.Qword(addr + ExtraDataList.Offset.PtrBSExtraData.value)
+        if extraDataAddr == 0:
             self.ExtraData = NullObject()
         else:
-            self.ExtraData = BSExtraData(extraData)
-            extraDataTypes = {
-                0x99: ExtraTextDisplayData
-            }
-            extraDataType = extraDataTypes.get(self.ExtraData.Type, BSExtraData)
-            if (extraDataType != BSExtraData):
-                self.ExtraData = extraDataType(addr)
+            if deepness >= max_deepness:
+                self.ExtraData = extraDataAddr
+            else:
+                self.ExtraData = BSExtraData(extraDataAddr, deepness + 1)
+                extraDataTypes = {
+                    0x99: ExtraTextDisplayData
+                }
+                extraDataType = extraDataTypes.get(self.ExtraData.Type, BSExtraData)
+                if (extraDataType != BSExtraData):
+                    self.ExtraData = extraDataType(addr, deepness + 1)
 
     def __repr__(self):
         extra = ConditionalFormat(self.ExtraData)
@@ -202,22 +205,22 @@ class ExtraDataList(MemObject):
         PtrBSExtraData = 0x08
 
 class BaseFormComponent(MemObject):
-    def __init__(self, addr):
-        super(BaseFormComponent, self).__init__(addr)
+    def __init__(self, addr, deepness = 0):
+        super(BaseFormComponent, self).__init__(addr, deepness)
         self.vftable = idc.Qword(addr + BaseFormComponent.Offset.vftable)
 
     class Offset(Enum):
         vftable = 0
 
 class TESForm(MemObject):
-    def __init__(self, addr):
-        super(TESForm, self).__init__(addr)
+    def __init__(self, addr, deepness = 0):
+        super(TESForm, self).__init__(addr, deepness)
         self.formType = idc.Byte(addr + TESForm.Offset.FormType.value)
         self.flags = idc.Dword(addr + TESForm.Offset.Flags.value)
         self.formId = idc.Dword(addr + TESForm.Offset.FormId.value)
 
-    def getVFTable(self, recursive = True, flat = False):
-        return VFTable(idc.Qword(self.addr), recursive, flat)
+    def getVFTable(self):
+        return VFTable(idc.Qword(self.addr), self.deepness + 1)
     
     def getName(self, max_length=None):
         name = None
@@ -247,29 +250,36 @@ class TESForm(MemObject):
         FormType = 0x1A
 
 class TESFullName(BaseFormComponent):
-    def __init__(self, addr):
-        super(TESFullName, self).__init__(addr)
-        self.Name = BSFixedString(0x08)
+    def __init__(self, addr, deepness = 0):
+        super(TESFullName, self).__init__(addr, deepness)
+        fixedStringAddr = addr + TESFullName.Offset.Name.value
+        if deepness >= max_deepness:
+            self.Name = fixedStringAddr
+        else:
+            self.Name = BSFixedString(fixedStringAddr, deepness + 1)
 
     class Offset(Enum):
         Name = 0x08
 
 class Stack(MemObject):
-    def __init__(self, addr, recursive = True, flat = False):
-        super(Stack, self).__init__(addr, recursive, flat)
+    def __init__(self, addr, deepness = 0):
+        super(Stack, self).__init__(addr, deepness)
         nextStackAddr = idc.Qword(addr + Stack.Offset.PtrNextStack.value)
         if nextStackAddr == 0:
             self.NextStack = NullObject()
         else:
-            if (recursive):
-                self.NextStack = Stack(nextStackAddr, recursive, flat)
-            else:
+            if deepness >= max_deepness:
                 self.NextStack = nextStackAddr
-        extraDataList = idc.Qword(addr + Stack.Offset.PtrExtraDataList.value)
-        if extraDataList == 0:
+            else:
+                self.NextStack = Stack(nextStackAddr, deepness + 1)
+        extraDataListAddr = idc.Qword(addr + Stack.Offset.PtrExtraDataList.value)
+        if extraDataListAddr == 0:
             self.ExtraDataList = NullObject()
         else:
-            self.ExtraDataList = ExtraDataList(extraDataList)
+            if deepness >= max_deepness:
+                self.ExtraDataList = extraDataListAddr
+            else:
+                self.ExtraDataList = ExtraDataList(extraDataListAddr, deepness + 1)
         self.count = idc.Dword(addr + Stack.Offset.Count.value)
         self.flags = idc.Byte(addr + Stack.Offset.Flags.value)
 
@@ -316,8 +326,8 @@ class Stack(MemObject):
         Flags               = 0x24
 
 class BGSInventoryItem(MemObject):
-    def __init__(self, addr, recursive = True, flat = False):
-        super(BGSInventoryItem, self).__init__(addr, recursive, flat)
+    def __init__(self, addr, deepness = 0):
+        super(BGSInventoryItem, self).__init__(addr, deepness)
 
         formAddr = idc.Qword(addr + BGSInventoryItem.Offset.form.value)
         stackAddr = idc.Qword(addr + BGSInventoryItem.Offset.stack.value)
@@ -325,18 +335,18 @@ class BGSInventoryItem(MemObject):
         if stackAddr == 0:
             self.stack = NullObject()
         else:
-            if flat:
+            if deepness >= max_deepness:
                 self.stack = stackAddr
             else:
-                self.stack = Stack(stackAddr, recursive, flat)
+                self.stack = Stack(stackAddr, deepness + 1)
         
         if formAddr == 0:
             self.form = NullObject()
         else:
-            if flat:
+            if deepness >= max_deepness:
                 self.form = formAddr
             else:
-                self.form = TESForm(formAddr)
+                self.form = TESForm(formAddr, deepness + 1)
 
     def __repr__(self):
         form = ConditionalFormat(self.form if self.isFlat else self.form.addr)
@@ -374,20 +384,24 @@ class BGSInventoryItem(MemObject):
         return itemName
 
 class TArray(MemObject):
-    def __init__(self, addr, t_type = None, t_size = None, recursive = True, flat = False):
-        super(TArray, self).__init__(addr, recursive, flat)
+    def __init__(self, addr, t_type = None, t_size = None, deepness = 0):
+        super(TArray, self).__init__(addr, deepness)
         self.capacity = idc.Dword(addr + TArray.Offset.Capacity.value)
         self.count = idc.Dword(addr + TArray.Offset.Count.value)
+        self.maxEntries = 300
         self.t_type = t_type
 
         self.entriesAddr = idc.Qword(addr + TArray.Offset.Entries.value)
         if t_type is None:
             self.Entries = NullObject()
         else:
-            if (self.count <= 0):
-                self.Entries = []
-                return
-            self.Entries = [t_type(i, recursive, flat) for i in range(self.entriesAddr, self.entriesAddr + 16 * self.count, t_size)]
+            if deepness >= max_deepness:
+                self.Entries = self.entriesAddr
+            else:
+                if (self.count <= 0) or (t_type is None) or (t_size is None):
+                    self.Entries = []
+                else:
+                    self.Entries = [t_type(i, deepness + 1) for i in range(self.entriesAddr, self.entriesAddr + t_size * (self.count if self.count < self.maxEntries else self.maxEntries), t_size)]
 
     def __repr__(self):
         type_name = "<unknown>" if self.t_type is None else self.t_type.__name__
@@ -399,29 +413,37 @@ class TArray(MemObject):
         Count = 0x10
 
 class BGSInventoryList(MemObject):
-    def __init__(self, addr, recursive = True, flat = False):
-        super(BGSInventoryList, self).__init__(addr, recursive, flat)
-        self.Items = TArray(addr + BGSInventoryList.Offset.Items.value, BGSInventoryItem, 16, recursive, flat)
+    def __init__(self, addr, deepness = 0):
+        super(BGSInventoryList, self).__init__(addr, deepness)
         self.weight = idc.GetFloat(addr + BGSInventoryList.Offset.Weight.value)
+        inventoryItemsAddr = addr + BGSInventoryList.Offset.Items.value
+        if (deepness >= max_deepness):
+            self.Items = inventoryItemsAddr
+        else:
+            self.Items = TArray(inventoryItemsAddr, BGSInventoryItem, 16, deepness + 1)
     
     def __repr__(self):
         count = 0
+        items = ConditionalFormat(self.Items)
         try:
             count = self.Items.count
         except:
             if pdbg: traceback.print_exc()
-        return "<BGSInventoryList at 0x%X, weight: %s, count: %s, items: 0x%X>" % (self.addr, self.weight, count, self.Items.addr)
+        return ("<BGSInventoryList at 0x{:X}, weight: {}, count: {}, items: "+ items.format + ">").format(self.addr, self.weight, count, items.repr)
 
     class Offset(Enum):
         Items   = 0x58 # TArray<BGSInventoryItem>
         Weight  = 0x70 # float (4 bytes)
 
 class TESObjectREFR(TESForm):
-    def __init__(self, addr, recursive = True, flat = False):
-        super(TESObjectREFR, self).__init__(addr)
-        self.isRecursive = recursive
-        self.flat = flat
-        self.InventoryList = BGSInventoryList(idc.Qword(addr + TESObjectREFR.Offset.InventoryList.value), recursive, flat)
+    def __init__(self, addr, deepness = 0):
+        super(TESObjectREFR, self).__init__(addr, deepness)
+        inventoryListAddr = idc.Qword(addr + TESObjectREFR.Offset.InventoryList.value)
+
+        if (deepness >= max_deepness):
+            self.InventoryList = inventoryListAddr
+        else:
+            self.InventoryList = BGSInventoryList(inventoryListAddr, deepness + 1)
     
     def __repr__(self):
         return "<TESObjectREFR at 0x%X, BGSInventoryList: 0x%X, Form:\n  %s>" % (self.addr, self.InventoryList.addr, super(TESObjectREFR, self).__repr__())
@@ -430,18 +452,18 @@ class TESObjectREFR(TESForm):
         InventoryList = 0xF8
 
 class VFTable(MemObject):
-    def __init__(self, addr, recursive = True, flat = False):
-        super(VFTable, self).__init__(addr, recursive, flat)
+    def __init__(self, addr, deepness = 0):
+        super(VFTable, self).__init__(addr, deepness)
 
         ptrRttiCol = self.addr + VFTable.Offset.RTTICompleteObjectLocator.value
         rttiCOLAddr = idc.Qword(ptrRttiCol)
         if pdbg: print("COLp: 0x%X" % (ptrRttiCol))
         if pdbg: print("COL : 0x%X" % (rttiCOLAddr))
 
-        if flat:
+        if deepness >= max_deepness:
             self.RTTICompleteObjectLocator = rttiCOLAddr
         else:
-            self.RTTICompleteObjectLocator = RTTICompleteObjectLocator(rttiCOLAddr, recursive, flat)
+            self.RTTICompleteObjectLocator = RTTICompleteObjectLocator(rttiCOLAddr, deepness + 1)
 
         # short names
         self.col = self.RTTICompleteObjectLocator
@@ -454,8 +476,8 @@ class VFTable(MemObject):
         RTTICompleteObjectLocator = - 0x8   # 0x8
 
 class RTTICompleteObjectLocator(MemObject):
-    def __init__(self, addr, recursive = True, flat = False):
-        super(RTTICompleteObjectLocator, self).__init__(addr)
+    def __init__(self, addr, deepness = 0):
+        super(RTTICompleteObjectLocator, self).__init__(addr, deepness)
         
         self.thisOffset = idc.Dword(self.addr + RTTICompleteObjectLocator.Offset.this.value)
         self.ctorDisplacement = idc.Dword(self.addr + RTTICompleteObjectLocator.Offset.ctorDisplacement.value)
@@ -464,12 +486,12 @@ class RTTICompleteObjectLocator(MemObject):
         if pdbg: print("RTD: 0x%X" % (descriptorAddr))
         if pdbg: print("RTH: 0x%X" % (hierarchyAddr))
 
-        if flat:
+        if deepness >= max_deepness:
             self.RTTITypeDescriptor = descriptorAddr
             self.RTTIClassHierarchyDescriptor = hierarchyAddr
         else:
-            self.RTTITypeDescriptor = RTTITypeDescriptor(descriptorAddr, recursive, True if recursive else False)
-            self.RTTIClassHierarchyDescriptor = RTTIClassHierarchyDescriptor(hierarchyAddr, recursive, True if recursive else False)
+            self.RTTITypeDescriptor = RTTITypeDescriptor(descriptorAddr, deepness + 1)
+            self.RTTIClassHierarchyDescriptor = RTTIClassHierarchyDescriptor(hierarchyAddr, deepness + 1)
 
         # TODO: add self.ObjectBase
 
@@ -486,8 +508,8 @@ class RTTICompleteObjectLocator(MemObject):
         rvaObjectBase       = 0x14  # 0x4
 
 class RTTITypeDescriptor(MemObject):
-    def __init__(self, addr, recursive = True, flat = False):
-        super(RTTITypeDescriptor, self).__init__(addr, recursive, flat)
+    def __init__(self, addr, deepness = 0):
+        super(RTTITypeDescriptor, self).__init__(addr, deepness)
         nameAddr = addr + RTTITypeDescriptor.Offset.mangledName.value + RTTITypeDescriptor.NameOffset.classPrefix.value
         if pdbg: print("NAM: 0x%X" % (nameAddr))
         self.mangledName = idc.GetString(nameAddr)
@@ -508,31 +530,38 @@ class RTTITypeDescriptor(MemObject):
         classPrefix         = 0x4   # skips "class" prefix
 
 class RTTIClassHierarchyDescriptor(MemObject):
-    def __init__(self, addr, recursive, flat):
-        super(RTTIClassHierarchyDescriptor, self).__init__(addr, recursive = True, flat = False)
+    def __init__(self, addr, deepness = 0):
+        super(RTTIClassHierarchyDescriptor, self).__init__(addr, deepness)
 
         signatureAddr = addr + RTTIClassHierarchyDescriptor.Offset.signature.value
         attributesAddr = addr + RTTIClassHierarchyDescriptor.Offset.attributes.value
         numberOfItemsAddr = addr + RTTIClassHierarchyDescriptor.Offset.numberOfItems.value
-        baseClassHierarchyArr = RVA(idc.Dword(addr + RTTIClassHierarchyDescriptor.Offset.rvaBaseClassArrRef.value))
+        baseClassHierarchyArrAddr = RVA(idc.Dword(addr + RTTIClassHierarchyDescriptor.Offset.rvaBaseClassArrRef.value))
 
-        if pdbg: print("BCA: 0x%X" % (baseClassHierarchyArr))
+        if pdbg: print("BCA: 0x%X" % (baseClassHierarchyArrAddr))
 
         self.signature = idc.Dword(signatureAddr)
         self.attributes = idc.Dword(attributesAddr)
         self.numberOfItems = idc.Dword(numberOfItemsAddr)
-        self.baseClassHierarchyArray = baseClassHierarchyArr
+        self.baseClassHierarchyArray = baseClassHierarchyArrAddr
 
     def __repr__(self):
         return "<RTTITypeHierarchy at 0x%X, SIG: 0x%X, ATT: 0x%X, NUM: 0x%X>" % (self.addr, self.signature, self.attributes, self.numberOfItems)
 
-    def getChildren(self):
+    def getChildren(self, max_children = 50):
         # iterate over Base Class Array
-        children = []
+        children = [] 
+        if self.numberOfItems > max_children:
+            return children
+
         # 0-th child is reference to self
         for i in range(1, self.numberOfItems + 1):
             baseClassDescriptorAddr = RVA(idc.Dword(self.baseClassHierarchyArray + i * 4))
-            baseClassDescriptor = RTTIBaseClassDescriptor(baseClassDescriptorAddr, self.isRecursive, self.isFlat)
+            baseClassDescriptor = None
+            if self.deepness >= max_deepness:
+                baseClassDescriptor = baseClassDescriptorAddr
+            else:
+                baseClassDescriptor = RTTIBaseClassDescriptor(baseClassDescriptorAddr, self.deepness + 1)
             children.append(baseClassDescriptor)
         return children
 
@@ -552,8 +581,8 @@ class RTTIClassHierarchyDescriptor(MemObject):
         rvaBaseClassArrRef = 0x0C  # 0x4
 
 class RTTIBaseClassDescriptor(MemObject):
-    def __init__(self, addr, recursive = True, flat = False):
-        super(RTTIBaseClassDescriptor, self).__init__(addr, recursive, flat)
+    def __init__(self, addr, deepness = 0):
+        super(RTTIBaseClassDescriptor, self).__init__(addr, deepness)
         typeDescriptorAddr = RVA(idc.Dword(addr + RTTIBaseClassDescriptor.Offset.rvaTypeDescriptor.value))
         classHierarchyAddr = RVA(idc.Dword(addr + RTTIBaseClassDescriptor.Offset.rvaClassHierarchy.value))
 
@@ -566,12 +595,12 @@ class RTTIBaseClassDescriptor(MemObject):
         self.displacementWithinVFTable = idc.Dword(addr + RTTIBaseClassDescriptor.Offset.displacementWithinVFTable.value)
         self.baseClassAttributes = idc.Dword(addr + RTTIBaseClassDescriptor.Offset.baseClassAttributes.value)
 
-        if flat:
+        if deepness >= max_deepness:
             self.typeDescriptor = typeDescriptorAddr
             self.classHierarchyDescriptor = classHierarchyAddr
         else:
-            self.typeDescriptor = RTTITypeDescriptor(typeDescriptorAddr, recursive, True)
-            self.classHierarchyDescriptor = RTTIClassHierarchyDescriptor(classHierarchyAddr, recursive, True)
+            self.typeDescriptor = RTTITypeDescriptor(typeDescriptorAddr, deepness + 1)
+            self.classHierarchyDescriptor = RTTIClassHierarchyDescriptor(classHierarchyAddr, deepness + 1)
     
     def __repr__(self):
         return "<RTTIBaseClassDescriptor at 0x%X, RTD: 0x%X, NUM: 0x%s, MDS: 0x%s, VDS: 0x%s, DWV: 0x%s, BAT: 0x%X, BHD: 0x%X>" % (self.addr, self.typeDescriptor.addr, self.numberOfSubElements, self.memberDisplacement, self.vftableDisplacement, self.displacementWithinVFTable, self.baseClassAttributes, self.classHierarchyDescriptor.addr)

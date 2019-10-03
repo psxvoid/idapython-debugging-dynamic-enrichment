@@ -1,6 +1,8 @@
 import idc
 import ida_dbg
 
+from aenum import Constant
+
 class AddTraceError(Exception):
     def __init__(self, addr, message = None):
         super(AddTraceError, self).__init__()
@@ -10,8 +12,11 @@ class AddTraceError(Exception):
     def __repr__(self):
         return "<AddTraceError at address: 0x{:X}, message: {}>".format(self.addr, self.message)
 
-def addReadWriteTrace(addr):
-    result = idc.add_bpt(addr, 8, 3)
+class BreakpointMode(Constant):
+    ReadWrite = 3
+
+def addReadWriteTrace(addr, bpt_size = 1):
+    result = idc.add_bpt(addr, bpt_size, BreakpointMode.ReadWrite)
     if result == False:
         raise AddTraceError(addr, "Unable to set breakpoint at the given address.")
     pbpt = ida_dbg.bpt_t()

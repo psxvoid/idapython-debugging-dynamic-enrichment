@@ -8,17 +8,11 @@ try:
     if debughook:
         if debughook.isInstalled:
             debughook.unhook()
-        else:
-            debughook = debugger_dynamic_enrichment_hook.MyDbgHook()
-            debughook.hook()
-
 except:
-    try:
-        debughook = debugger_dynamic_enrichment_hook.MyDbgHook()
-        debughook.hook()
-    except Exception as e:
-        print(e)
     pass
+
+debughook = debugger_dynamic_enrichment_hook.MyDbgHook()
+debughook.hook()
 
 # Start debugging
 idaapi.run_requests()

@@ -349,8 +349,8 @@ class BGSInventoryItem(MemObject):
                 self.form = TESForm(formAddr, deepness + 1)
 
     def __repr__(self):
-        form = ConditionalFormat(self.form if self.isFlat else self.form.addr)
-        stack = ConditionalFormat(self.stack if self.isFlat else self.stack.addr)
+        form = ConditionalFormat(self.form if self.deepness >= max_deepness else self.form.addr)
+        stack = ConditionalFormat(self.stack if self.deepness >= max_deepness else self.stack.addr)
         
         return ("<BGSInventoryItem at 0x{:X}, TESForm: " + form.format + ", Stack: " + stack.format + ", Name: {}>").format(self.addr, form.repr, stack.repr, self.getName(12))
 
@@ -368,7 +368,7 @@ class BGSInventoryItem(MemObject):
         # TODO: move to a separate library file
         dynamic_cast = idaapi.Appcall.proto("msvcrt__RTDynamicCast", "PVOID __fastcall __RTDynamicCast (PVOID inptr, LONG VfDelta, PVOID SrcType, PVOID TargetType, BOOL isReference);")
 
-        tes_full_name_ptr = dynamic_cast(self.form if self.isFlat else self.form.addr, 0, 0x00000001436CB140, 0x00000001436CE220, 0).value
+        tes_full_name_ptr = dynamic_cast(self.form if self.deepness >= max_deepness else self.form.addr, 0, 0x00000001436CB140, 0x00000001436CE220, 0).value
 
         if (tes_full_name_ptr != 0):
             get_full_name_cstr = idaapi.Appcall.proto("TESFullName::get_name_cstr", "PVOID __fastcall __RTDynamicCast (PVOID inptr);")

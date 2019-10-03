@@ -3,6 +3,7 @@ import idaapi
 
 import traceback
 
+# idaapi.require("tes_object_refr_functions")
 import tes_object_refr_functions
 from DDE.IDAHelpers.timeout import exit_after
 
@@ -26,19 +27,21 @@ class TESObjectAnalyser(AnalyserBase):
             if pdbg: traceback.print_exc()
 
         try:
+            # BGSInventoryItem
             inventoryItem = tes.BGSInventoryItem(addr)
             formVFTable = inventoryItem.form.getVFTable()
 
             type_name = "TESForm"
             hasTESForm = tes.hasChildrenOfType(formVFTable.RTTICompleteObjectLocator.RTTIClassHierarchyDescriptor, type_name)
 
-            if hasTESForm & inventoryItem.stack.count > 0 and inventoryItem.stack.count < 20000:
+            if hasTESForm and inventoryItem.stack.count > 0 and inventoryItem.stack.count < 20000:
                 self.scanMessage = repr(inventoryItem)
                 return True
         except:
             if pdbg: traceback.print_exc()
 
         try:
+            # TESObjectREFR
             vftable = tes.VFTable(idc.Qword(addr))
             type_name = "TESObjectREFR"
 
@@ -52,6 +55,7 @@ class TESObjectAnalyser(AnalyserBase):
             if pdbg: traceback.print_exc()
 
         try:
+            # TESForm
             tesForm = tes.TESForm(addr)
             vftable = tesForm.getVFTable()
             

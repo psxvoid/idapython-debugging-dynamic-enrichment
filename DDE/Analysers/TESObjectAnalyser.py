@@ -37,19 +37,6 @@ class TESObjectAnalyser(AnalyserBase):
             if pdbg: traceback.print_exc()
 
         try:
-            tesForm = tes.TESForm(addr)
-            vftable = tesForm.getVFTable()
-            
-            type_name = "TESForm"
-            hasTESForm = tes.hasChildrenOfType(vftable.RTTICompleteObjectLocator.RTTIClassHierarchyDescriptor, type_name)
-
-            if (hasTESForm):
-                self.scanMessage = repr(tesForm)
-                return True
-        except:
-            if pdbg: traceback.print_exc()
-
-        try:
             vftable = tes.VFTable(idc.Qword(addr), False)
             type_name = "TESObjectREFR"
 
@@ -60,6 +47,19 @@ class TESObjectAnalyser(AnalyserBase):
                 self.scanMessage = repr(tes.TESObjectREFR(addr, False))
                 return True
         except Exception as e:
+            if pdbg: traceback.print_exc()
+
+        try:
+            tesForm = tes.TESForm(addr)
+            vftable = tesForm.getVFTable()
+            
+            type_name = "TESForm"
+            hasTESForm = tes.hasChildrenOfType(vftable.RTTICompleteObjectLocator.RTTIClassHierarchyDescriptor, type_name)
+
+            if (hasTESForm):
+                self.scanMessage = repr(tesForm)
+                return True
+        except:
             if pdbg: traceback.print_exc()
 
         return False

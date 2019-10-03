@@ -393,14 +393,15 @@ class BGSInventoryList(MemObject):
         Items   = 0x58 # TArray<BGSInventoryItem>
         Weight  = 0x70 # float (4 bytes)
 
-class TESObjectREFR(MemObject):
+class TESObjectREFR(TESForm):
     def __init__(self, addr, recursive = True, flat = False):
-        super(TESObjectREFR, self).__init__(addr, recursive, flat)
+        super(TESObjectREFR, self).__init__(addr)
+        self.isRecursive = recursive
+        self.flat = flat
         self.InventoryList = BGSInventoryList(idc.Qword(addr + TESObjectREFR.Offset.InventoryList.value), recursive, flat)
     
     def __repr__(self):
-        name = VFTable(idc.Qword(self.addr)).RTTICompleteObjectLocator.RTTITypeDescriptor.name
-        return "<TESObjectREFR at 0x%X, BGSInventoryList: 0x%X, Type:%s>" % (self.addr, self.InventoryList.addr, name)
+        return "<TESObjectREFR at 0x%X, BGSInventoryList: 0x%X, Form:\n  %s>" % (self.addr, self.InventoryList.addr, super(TESObjectREFR, self).__repr__())
 
     class Offset(Enum):
         InventoryList = 0xF8

@@ -14,6 +14,7 @@ class Track(object):
         super(Track, self).__init__()
         self.operandSource = operandSource
         self.operandTarget = operandTarget
+        self.children = []
 
 class OperandType(Enum):
     Register64 = 1
@@ -122,6 +123,9 @@ class OperandStringParser(object):
 class Operand(object):
     def __init__(self, instructionAddress, operandIndex):
         super(Operand, self).__init__()
+        self.instructionAddress = instructionAddress
+        self.operandIndex = operandIndex
+        self.value = None
 
         self.opStr = idc.GetOpnd(instructionAddress, operandIndex)
         self.opValue = idc.GetOperandValue(instructionAddress, operandIndex)
@@ -142,25 +146,30 @@ class Operand(object):
         self.parser = OperandStringParser(opStr)
 
     def readValue(self):
+        if self.value != None:
+            return self.value
+
         operandType = self.parser.getOperandType()
         regName = self.parser.getRegName()
         regValue = idc.GetRegValue(regName) if regName != None else None
         if operandType == OperandType.Value64OfRegisterPlusOffset:
-            return idc.Qword(regValue + self.opValue)
+            self.value = idc.Qword(regValue + self.opValue)
         elif operandType == OperandType.Value32OfRegisterPlusOffset:
-            return idc.Dword(regValue + self.opValue)
+            self.value = idc.Dword(regValue + self.opValue)
         elif operandType == OperandType.Value16OfRegisterPlusOffset:
-            return idc.Word(regValue + self.opValue)
+            self.value = idc.Word(regValue + self.opValue)
         elif operandType == OperandType.Value8OfRegisterPlusOffset:
-            return idc.Byte(regValue + self.opValue)
+            self.value = idc.Byte(regValue + self.opValue)
         elif (operandType == OperandType.Register64) or (operandType == OperandType.Register32):
-            return regValue
+            self.value = regValue
         elif (operandType == OperandType.Register16) or (operandType == OperandType.Register8):
-            return regValue
+            self.value = regValue
         elif operandType == OperandType.ImmediateUnkown:
-            return self.opValue
+            self.value = self.opValue
         else:
             raise Exception("Unknown operand type")
+
+        return self.value
 
 class Instruction(object):
     def __init__(self, addr):
@@ -242,13 +251,46 @@ class TrackHistory(object):
         super(TrackHistory, self).__init__()
         self.name = name
         self.valueToTrack = valueToTrack
-        self.history = []
+        self.historyRoots = []
+        self.recentRoots = []
     
-    def addTrackToHistory(self, track):
-        if not issubclass(track, Track):
+    def addTrack(self, newTrack):
+        # TODO: rewrite using binary tree for faster match (key: targetOperand)
+        
+        if not issubclass(newTrack, Track):
             raise Exception("Track history only holds subclusses of {}".format(Track.__name__))
+        
+        if len(self.historyRoots) == 0:
+            self.historyRoots.append(newTrack)
 
-        self.history.append(track)
+        # shallow scan
+        for track in self.recentRoots:
+            if track.targetOperand.readValue() == newTrack.sourceOperand.readValue():
+                track.children.append(track)
+                self.recentRoots.remove(track)
+                self.recentRoots.append(newTrack)
+                return
+        
+        # deep scan
+        for track in self.historyRoots:
+            if self.__addTrack__(track, newTrack): return
+        
+        # parent isn't found, add it as a new root
+        self.historyRoots.append(newTrack)
+
+    def __addTrack__(self, track, newTrack):
+        if track == None: return False
+
+        if track.targetOperand.readValue() == newTrack.sourceOperand.readValue():
+            track.children.append(newTrack)
+            self.recentRoots.append(newTrack)
+            return True
+        
+        if len(track.children) > 0:
+            for childTrack in track.children:
+                return self.__addTrack__(childTrack, newTrack)
+        
+        return False
 
 class VarTracker(object):
     def __init__(self):
@@ -305,4 +347,4 @@ class VarTracker(object):
             track = tracker.getTrack(trackHistory.valueToTrack)
             if track is None:
                 continue
-            trackHistory.addTrackToHistory(track)
+            trackHistory.addTrack(track)

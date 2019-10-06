@@ -3,6 +3,8 @@ import idaapi
 import re
 from aenum import Enum
 
+from DDE.IDAHelpers.funcscope import  GetFuncStartAddr, GetFuncEndAddr
+
 idaapi.require('arch64')
 from arch64 import x64Regs, x32Regs, x16Regs, x8Regs, x64RegList, x32RegList, x16RegList, x8RegList
 
@@ -15,6 +17,22 @@ class Track(object):
         self.operandSource = operandSource
         self.operandTarget = operandTarget
         self.children = []
+    
+    def __repr__(self):
+        result = "<Track src: 0x{:X}, trg: 0x{:X}>".format(self.operandSource.instructionAddress)
+        children = self.children
+        deepness = 1
+        while len(children) > 0:
+            tab = ""
+            for i in range(0, 1):
+                tab = tab + " "
+            
+            for child in children:
+                result = result + "\n"
+                result = result + tab
+                result = repr(children)
+        
+        return result
 
 class OperandType(Enum):
     Register64 = 1
@@ -143,7 +161,7 @@ class Operand(object):
         # | rcx                 | 1            |
         # | 2Fh                 | 0x2F         |
 
-        self.parser = OperandStringParser(opStr)
+        self.parser = OperandStringParser(self.opStr)
 
     def readValue(self):
         if self.value != None:
@@ -190,7 +208,7 @@ class MovInstruction(Instruction):
     def getSourceValue(self):
         sourceOperand = self.getSourceOperand()
         if sourceOperand is None:
-            return None
+           return None
 
         return sourceOperand.readValue() 
     
@@ -241,7 +259,7 @@ class InstructionTrackerFactory(object):
         }
 
     def getTrackerForInstruction(self, supportedInstruction):
-        supportedTrackerCtor = self.supportedTrackers.get(supportedInstruction, None)
+        supportedTrackerCtor = self.supportedTrackers.get(type(supportedInstruction), None)
         if supportedTrackerCtor is None:
             return None
         return supportedTrackerCtor(supportedInstruction)
@@ -256,6 +274,8 @@ class TrackHistory(object):
     
     def addTrack(self, newTrack):
         # TODO: rewrite using binary tree for faster match (key: targetOperand)
+        
+        print("Adding {}".format(repr(newTrack)))
         
         if not issubclass(newTrack, Track):
             raise Exception("Track history only holds subclusses of {}".format(Track.__name__))
@@ -299,17 +319,11 @@ class VarTracker(object):
         self.rangeStart = 0
         self.rangeEnd = 0
 
-        self.supportedInstructions = []
-        self.supportedInstructions.append(MovInstruction())
+        self.supportedInstructions = {
+            "mov": MovInstruction
+        }
 
         self.trackerFactory = InstructionTrackerFactory()
-    
-    def getSupportedInstruction(self, instructionMnemonics):
-        for instruction in self.supportedInstructions:
-            if instruction.canHandleMnemonics(instructionMnemonics):
-                return instruction
-
-        return None
     
     def trackVariable(self, valueIdentifier, valueToTrack):
         trackHistory = self.trackHistories.get(valueIdentifier, None)
@@ -317,6 +331,10 @@ class VarTracker(object):
             self.trackHistories[valueIdentifier] = TrackHistory(valueIdentifier, valueToTrack)
         else:
             raise Exception("Variable {} is already tracked. You can remove it from tracking by calling 'stopTracking' method", valueIdentifier)
+    
+    def trackVariables(self, variables):
+        for v in variables:
+            self.trackVariable(v[0], v[1])
 
     def stopTracking(self, valueIdentifier):
         trackHistory = self.trackHistories.get(valueIdentifier, None)
@@ -334,11 +352,11 @@ class VarTracker(object):
         instructionMnemonics = idc.GetMnem(ripValue)
 
         for valueIdentifier in self.trackHistories:
-            instruction = self.getSupportedInstruction(instructionMnemonics)
+            instruction = self.supportedInstructions.get(instructionMnemonics, None)
             if instruction is None:
                 return
 
-            tracker = self.trackerFactory.getTrackerForInstruction(instruction)
+            tracker = self.trackerFactory.getTrackerForInstruction(instruction(ripValue))
             if tracker is None:
                 raise Exception("Tracker is not registered for the instruction {}".format(type(instruction).__name__))
 
@@ -348,3 +366,16 @@ class VarTracker(object):
             if track is None:
                 continue
             trackHistory.addTrack(track)
+    
+    def beginAnalysis(self):
+        if (self.rangeStart == 0) or (self.rangeEnd == 0):
+            activeFuncScopeAddr = idc.ScreenEA()
+
+            self.rangeStart = activeFuncScopeAddr
+            self.rangeEnd = GetFuncEndAddr(activeFuncScopeAddr)
+
+        # begin automatic debugging
+        while idc.GetRegValue(x64Regs.RIP.value) != self.rangeEnd:
+            idaapi.step_into()
+            idc.GetDebuggerEvent(idc.WFNE_SUSP, -1)
+            self.analyseStep()

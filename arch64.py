@@ -78,3 +78,5 @@ x64RegList = [i.value for i in list(x64Regs)]
 x32RegList = [i.value for i in list(x32Regs)]
 x16RegList = [i.value for i in list(x16Regs)]
 x8RegList = [i.value for i in list(x8Regs)]
+
+x64RegCommonList = [i.value for i in list(x64Regs) if i.value != x64Regs.RIP.value]

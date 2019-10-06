@@ -1,15 +1,14 @@
 import idc
 import idaapi
 
-idaapi.require('tes_object_refr_functions')
-import tes_object_refr_functions
-tes = tes_object_refr_functions
-
 idaapi.require('.AnalyserBase', 'DDE.Analysers')
-from DDE.Analysers.AnalyserBase import AnalyserBase
 idaapi.require('.TESObjectAnalyser', 'DDE.Analysers')
+idaapi.require('.VFTableAnalyser', 'DDE.Analysers')
+idaapi.require('arch64')
+from DDE.Analysers.AnalyserBase import AnalyserBase
 from DDE.Analysers.TESObjectAnalyser import TESObjectAnalyser
 from DDE.Analysers.VFTableAnalyser import VFTableAnalyser
+from arch64 import x64RegCommonList
 
 pdbg = False
 pvrb = False
@@ -55,11 +54,9 @@ def scan_register(reg_str_name):
         except:
             pass
 
-x64registers = ['rax', 'rbx', 'rcx', 'rdx', 'rsi', 'rdi', 'rbp', 'rsp', 'r8', 'r9', 'r10', 'r11', 'r12', 'r13', 'r14', 'r15']
-
 def scanRegisters():
     if pvrb: print("scanning...")
-    for reg in x64registers:
+    for reg in x64RegCommonList:
         scan_register(reg)
     print("scan completed.")
 

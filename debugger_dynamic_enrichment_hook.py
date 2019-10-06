@@ -9,6 +9,7 @@ idaapi.require('.AnalyserBase', 'DDE.Analysers')
 from DDE.Analysers.AnalyserBase import AnalyserBase
 idaapi.require('.TESObjectAnalyser', 'DDE.Analysers')
 from DDE.Analysers.TESObjectAnalyser import TESObjectAnalyser
+from DDE.Analysers.VFTableAnalyser import VFTableAnalyser
 
 pdbg = False
 pvrb = False
@@ -18,7 +19,7 @@ def scan_register(reg_str_name):
     if pdbg: print("Reg scan: %s" % (reg_str_name))
     # TODO: iterate over scanners
     # scanners = AnalyserBase.__subclasses__()
-    scanners = [TESObjectAnalyser(), AddressScanner_VFTable()]
+    scanners = [TESObjectAnalyser(), VFTableAnalyser()]
     if pvrb: print("Found %s scanners." % (len(scanners)))
 
     for scanner in scanners:
@@ -53,23 +54,6 @@ def scan_register(reg_str_name):
                 return
         except:
             pass
-
-class AddressScanner_VFTable(AnalyserBase):
-    def __init__(self, *args, **kwargs):
-        super(AddressScanner_VFTable, self).__init__(*args, **kwargs)
-    
-    def getMatch(self, addr):
-        try:
-            vftable = tes.VFTable(addr)
-            name = vftable.RTTICompleteObjectLocator.RTTITypeDescriptor.name
-            if (name is None) or (len(name) <= 0):
-                return False
-            else:
-                self.scanMessage = repr(vftable.RTTICompleteObjectLocator.RTTITypeDescriptor)
-                return True
-        except Exception as e:
-            if pdbg: print(e)
-            return False
 
 x64registers = ['rax', 'rbx', 'rcx', 'rdx', 'rsi', 'rdi', 'rbp', 'rsp', 'r8', 'r9', 'r10', 'r11', 'r12', 'r13', 'r14', 'r15']
 

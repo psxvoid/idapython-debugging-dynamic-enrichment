@@ -4,44 +4,28 @@ import traceback
 
 from aenum import Enum
 
-import DDE.IDAHelpers.addtrace
-at = DDE.IDAHelpers.addtrace
+from DDE.Common.memobject import MemObject, ConditionalFormat
+from DDE.IDAHelpers.rva import RVA
+from DDE.IDAHelpers.addtrace import addReadWriteTrace
 
 ptrSize = 8
 max_deepness = 10
 max_hierarchy_deepness = 45
 pdbg = False
 
-class ConditionalFormat(object):
-    def __init__(self, value):
-        super(ConditionalFormat, self).__init__()
-
-        if type(value) == NullObject:
-            self.format = "{}"
-            self.repr = repr(value)
-        elif issubclass(type(value), MemObject):
-            self.format = "0x{:X}"
-            self.repr = value.addr
-        else:
-            self.format = "0x{:X}"
-            self.repr = value
-
-    def __repr__(self):
-        return "<ConditionalFormat format: %s, repr: %s>" % (self.format, self.repr)
-
 def addTraceTo(ea_or_mem_obj, bpt_size = 1):
     if issubclass(type(ea_or_mem_obj), BGSInventoryList):
         print("Adding trace to BGSInventoryList...")
         for item in ea_or_mem_obj.Items.Entries:
-           at.addReadWriteTrace(item.addr, bpt_size)
+           addReadWriteTrace(item.addr, bpt_size)
         print("Done.")
     elif issubclass(type(ea_or_mem_obj), MemObject):
         print("Adding trace to MemObject...")
-        at.addReadWriteTrace(ea_or_mem_obj.addr)
+        addReadWriteTrace(ea_or_mem_obj.addr)
         print("Done.")
     else:
         print("Adding trace to address...")
-        at.addReadWriteTrace(ea_or_mem_obj, bpt_size)
+        addReadWriteTrace(ea_or_mem_obj, bpt_size)
         print("Done.")
 
 def hasChildrenOfType(classHierarchyDescriptor, typeName, deepness = 0):
@@ -58,31 +42,6 @@ def hasChildrenOfType(classHierarchyDescriptor, typeName, deepness = 0):
                 return False
     return False
 
-class MemObject(object):
-    def __init__(self, addr, deepness = 0):
-        self.addr = addr
-        self.deepness = deepness
-
-    def __repr__(self):
-        return "<MemObject at 0x{:X}>".format(self.addr)
-
-    def __eq__(self, other):
-        if isinstance(other, MemObject):
-            return self.addr == other.addr
-        return False
-
-    def __ne__(self, other):
-        result = self.__eq__(other)
-
-class NullObject(object):
-    def __init__(self, *args, **kwargs):
-        super(NullObject, self).__init__(*args, **kwargs)
-
-    def __repr__(self):
-        return "NULL"
-
-def RVA(rva_addr):
-    return idaapi.get_imagebase() + rva_addr
 
 class BSExtraData(MemObject):
     def __init__(self, addr, deepness = 0):

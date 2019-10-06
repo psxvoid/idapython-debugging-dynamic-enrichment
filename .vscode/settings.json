@@ -1,5 +1,23 @@
 {
     "cSpell.words": [
+        "Disasm",
+        "Dword",
+        "LPCSTR",
+        "PVOID",
+        "Qword",
+        "REFR",
+        "RTTI",
+        "SUSP",
+        "WFNE",
+        "analysers",
+        "cstr",
+        "hwnd",
+        "inptr",
+        "msvcrt",
+        "pdbg",
+        "proto",
+        "pvrb",
+        "pytest",
         "vftable"
     ]
 }

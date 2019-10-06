@@ -3,13 +3,12 @@ import idaapi
 
 import traceback
 
-# idaapi.require("tes_object_refr_functions")
-import tes_object_refr_functions
+from tesobjects import BGSInventoryItem, TESObjectREFR, TESForm, TArray
+from DDE.RTTI.msvcrt.descriptors import VFTable, hasChildrenOfType
 from DDE.IDAHelpers.timeout import exit_after
 
 from DDE.Analysers.AnalyserBase import AnalyserBase
 
-tes = tes_object_refr_functions
 pdbg = False
 
 class TESObjectAnalyser(AnalyserBase):
@@ -19,7 +18,7 @@ class TESObjectAnalyser(AnalyserBase):
     @exit_after(2)
     def getMatch(self, addr):
         try:
-            tArray = tes.TArray(addr)
+            tArray = TArray(addr)
             if tArray.count > 0 and tArray.capacity > 0 and tArray.count < tArray.capacity and tArray.count <= 10000:
                 self.getScanMessage = repr(tArray)
                 return True
@@ -28,11 +27,11 @@ class TESObjectAnalyser(AnalyserBase):
 
         try:
             # BGSInventoryItem
-            inventoryItem = tes.BGSInventoryItem(addr)
+            inventoryItem = BGSInventoryItem(addr)
             formVFTable = inventoryItem.form.getVFTable()
 
             type_name = "TESForm"
-            hasTESForm = tes.hasChildrenOfType(formVFTable.RTTICompleteObjectLocator.RTTIClassHierarchyDescriptor, type_name)
+            hasTESForm = hasChildrenOfType(formVFTable.RTTICompleteObjectLocator.RTTIClassHierarchyDescriptor, type_name)
 
             if hasTESForm and inventoryItem.stack.count > 0 and inventoryItem.stack.count < 20000:
                 self.scanMessage = repr(inventoryItem)
@@ -42,25 +41,25 @@ class TESObjectAnalyser(AnalyserBase):
 
         try:
             # TESObjectREFR
-            vftable = tes.VFTable(idc.Qword(addr))
+            vftable = VFTable(idc.Qword(addr))
             type_name = "TESObjectREFR"
 
             isTESObjectREFRName = vftable.RTTICompleteObjectLocator.RTTITypeDescriptor.name == type_name
-            hasTESObjectREFRSubClass = tes.hasChildrenOfType(vftable.RTTICompleteObjectLocator.RTTIClassHierarchyDescriptor, type_name)
+            hasTESObjectREFRSubClass = hasChildrenOfType(vftable.RTTICompleteObjectLocator.RTTIClassHierarchyDescriptor, type_name)
 
             if isTESObjectREFRName or hasTESObjectREFRSubClass:
-                self.scanMessage = repr(tes.TESObjectREFR(addr))
+                self.scanMessage = repr(TESObjectREFR(addr))
                 return True
         except Exception as e:
             if pdbg: traceback.print_exc()
 
         try:
             # TESForm
-            tesForm = tes.TESForm(addr)
+            tesForm = TESForm(addr)
             vftable = tesForm.getVFTable()
             
             type_name = "TESForm"
-            hasTESForm = tes.hasChildrenOfType(vftable.RTTICompleteObjectLocator.RTTIClassHierarchyDescriptor, type_name)
+            hasTESForm = hasChildrenOfType(vftable.RTTICompleteObjectLocator.RTTIClassHierarchyDescriptor, type_name)
 
             if (hasTESForm):
                 self.scanMessage = repr(tesForm)

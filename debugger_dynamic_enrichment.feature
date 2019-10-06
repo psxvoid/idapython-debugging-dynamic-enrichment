@@ -1,6 +1,4 @@
-Scenario: Multiline step using sub indentation
-    Given I have a step with:
-        Some
-        Extra
-        Lines
-    Then the text should be parsed with correct indentation
+Scenario: Main module initialization should install debugger hooks
+    Given the script is ran for the first time
+    When the main module is loaded
+    Then it should create a dubugger hook

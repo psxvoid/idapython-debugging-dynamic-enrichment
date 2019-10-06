@@ -9,6 +9,23 @@ import re
 # Ask for a prefix that will be added to subs in the specified range
 func_prefix = idc.AskStr("MyClass::", "Enter a prefix that will be added to subs")
 
+if (func_prefix == "MyClass::") or not func_prefix:
+    quit()
+
+start_addr = idc.SelStart()
+end_addr = idc.SelEnd()
+#start = idc.SelStart()
+#end = idc.SelEnd()
+
+# print hex(start), hex(end)
+
+# while start < end: 
+#     # print hex(idc.Qword(start))
+#     print hex(start)
+#     start = idc.NextAddr(start)
+
+# quit()
+
 # [[441b119f]]
 # Asks for a start address of a vftable. Function names in this range (start_addr-end_addr) will be renamed.
 # 
@@ -22,10 +39,10 @@ func_prefix = idc.AskStr("MyClass::", "Enter a prefix that will be added to subs
 # Converts a HEX string into integer
 # arg1 - string to be converted to an integer
 # arg2 - base of the number, passed as a string in the first argument (16 = HEX)
-start_addr = idc.AskAddr(int('0x0000000142C79DF8', 16), "Enter a start address of a vftable")
+# start_addr = idc.AskAddr(int('0x0000000142C79DF8', 16), "Enter a start address of a vftable")
 
 # the same as [441b119f]
-end_addr = idc.AskAddr(0, "Enter an end address of a vftable")
+# end_addr = idc.AskAddr(0, "Enter an end address of a vftable")
 
 # bytes_str = idc.GetManyBytes(start_addr, 4, False)
 

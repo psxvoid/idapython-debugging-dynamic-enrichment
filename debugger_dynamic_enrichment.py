@@ -2,7 +2,7 @@ import idc
 import idaapi
 
 idaapi.require('debugger_dynamic_enrichment_hook')
-# import debugger_dynamic_enrichment_hook
+import debugger_dynamic_enrichment_hook
 
 try:
     if debughook:

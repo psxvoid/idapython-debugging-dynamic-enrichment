@@ -2,6 +2,8 @@ import idc
 import idaapi
 
 pdbg = False
+ptrSize = 8
+
 
 def get_class_name(name_addr):
     " Src: https://blog.quarkslab.com/visual-c-rtti-inspection.html "
@@ -17,9 +19,9 @@ def getVFTableName(ptr_to_vftable):
     if pdbg: print("VFT: %X" % (vftable))
     rttiCOL = idc.Qword(vftable - 8)         # RTTI Complete Object Locator
     if pdbg: print("COL: %X" % (rttiCOL))
-    classNameOffset = rttiCOL + 3 * 4
-    if pdbg: print("NOF: %X" % (classNameOffset))
-    typeDescriptor = idaapi.get_imagebase() + idc.Dword(classNameOffset)    # RTTI Type Descriptor
+    rvaTypeDescriptor = rttiCOL + 3 * 4
+    if pdbg: print("NOF: %X" % (rvaTypeDescriptor))
+    typeDescriptor = idaapi.get_imagebase() + idc.Dword(rvaTypeDescriptor)    # RTTI Type Descriptor
     if pdbg: print("RTD: %X" % (typeDescriptor))
     nameLoc = typeDescriptor + 2 * 8        # a class name offset in RTTI Type Descriptor
     if pdbg: print("NLO: %X" % (nameLoc))
@@ -27,6 +29,11 @@ def getVFTableName(ptr_to_vftable):
     if pdbg: print("NAM: %s" % (name))
     return name
 
-addr = idc.ScreenEA()
+def tryGetVFTableName(ptr_to_vftable):
+    try:
+        getVFTableName(ptr_to_vftable)
+    except:
+        return None
 
-print("Name: %s" % (getVFTableName(addr)))
+# addr = idc.ScreenEA()
+# print("Name: %s" % (getVFTableName(addr)))

@@ -19,6 +19,6 @@ print("BGSInventoryItems:")
 for i in tor.InventoryItems.Items.Entries:
     print(i)
 
-print("BGSInventoryItems Names:")
-for i in tor.InventoryItems.Items.Entries:
-    print(i.getName())
+# print("BGSInventoryItems Names:")
+# for i in tor.InventoryItems.Items.Entries:
+#     print(i.getName())

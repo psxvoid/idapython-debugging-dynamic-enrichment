@@ -225,7 +225,8 @@ class TESForm(MemObject):
     def getName(self, max_length=None):
         name = None
         try:
-            name = idc.GetString(idaapi.Appcall.proto("TESFullName::possibly_getItemFullNameValue", "PVOID __fastcall TESFullName::possibly_getItemFullNameValue (PVOID inptr);")(self.addr).value)
+            func_ea = idaapi.get_imagebase() + int('0x1599B0', 16)
+            name = idc.GetString(idaapi.Appcall.proto(func_ea, "PVOID __fastcall TESFullName::possibly_getItemFullNameValue (PVOID inptr);")(self.addr).value)
         except:
             if pdbg: traceback.print_exc()
 
@@ -375,7 +376,8 @@ class BGSInventoryItem(MemObject):
         tes_full_name_ptr = dynamic_cast(self.form if self.deepness >= max_deepness else self.form.addr, 0, 0x00000001436CB140, 0x00000001436CE220, 0).value
 
         if (tes_full_name_ptr != 0):
-            get_full_name_cstr = idaapi.Appcall.proto("TESFullName::get_name_cstr", "PVOID __fastcall __RTDynamicCast (PVOID inptr);")
+            func_ea = idaapi.get_imagebase() + int("0x52980", 16)
+            get_full_name_cstr = idaapi.Appcall.proto(func_ea, "PVOID __fastcall TESFullName::get_name_cstr (PVOID inptr);")
             strAddr = get_full_name_cstr(tes_full_name_ptr).value
             if strAddr != 0:
                 itemName = idc.GetString(strAddr)

@@ -1,4 +1,4 @@
-from aenum import Enum
+from aenum import Enum, Constant
 
 class x64Regs(Enum):
     RAX = 'RAX'
@@ -73,6 +73,9 @@ class x8Regs(Enum):
     R13b = 'r13b'
     R14b = 'r14b'
     R15b = 'r15b'
+
+class x64RegInfo(Constant):
+    MaxValue = 9223372036854775808
 
 x64RegList = [i.value for i in list(x64Regs)]
 x32RegList = [i.value for i in list(x32Regs)]

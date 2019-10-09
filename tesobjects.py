@@ -8,6 +8,7 @@ from DDE.Common.memobject import MemObject, NullObject, ConditionalFormat
 from DDE.IDAHelpers.rva import RVA
 from DDE.IDAHelpers.addtrace import addReadWriteTrace
 from DDE.RTTI.msvcrt.descriptors import VFTable
+from arch64 import x64RegInfo
 
 ptrSize = 8
 max_deepness = 10
@@ -28,6 +29,12 @@ def addTraceTo(ea_or_mem_obj, bpt_size = 1):
         print("Adding trace to address...")
         addReadWriteTrace(ea_or_mem_obj, bpt_size)
         print("Done.")
+
+class DeepnessExceededError(Exception):
+    def __init__(self, message = "Deepness exceeded the maximum value."):
+
+        # Call the base class constructor with the parameters it needs
+        super(DeepnessExceededError, self).__init__(message)
 
 class BSExtraData(MemObject):
     def __init__(self, addr, deepness = 0):
@@ -86,18 +93,109 @@ class StringCache(MemObject):
     def __init__(self, addr, deepness = 0):
         super(StringCache, self).__init__(addr, deepness)
 
-    class Entry(object):
+    class Entry(MemObject):
+        def __init__(self, addr, deepness=0):
+            super(StringCache.Entry, self).__init__(addr, deepness)
+            
+            self.state = idc.Dword(self.addr + StringCache.Entry.Offset.State.value)
+            self.dataAddr = (self.addr + StringCache.Entry.Offset.PtrData.value) % x64RegInfo.MaxValue
+
+        def hasCStrValue(self):
+            return ((self.state >> 14) & 0b11) & 1 == 0
+        
+        def getCStrAddr(self):
+            if self.hasCStrValue():
+                return self.dataAddr % x64RegInfo.MaxValue
+            
+            externDataAddr = idc.Qword(self.addr + StringCache.Entry.Offset.PtrExternDataEntry.value)
+
+            if externDataAddr == 0:
+                return NullObject()
+            
+            if self.deepness >= max_deepness:
+                raise DeepnessExceededError()
+            
+            return StringCache.Entry(externDataAddr, self.deepness + 1).getCStrAddr()
+
         class Offset(Enum):
             PtrNext             = 0
             State               = 0x08
             Length              = 0x0C
             PtrExternDataEntry  = 0x10
             PtrData             = 0x18
-    class Ref(object):
+
+    class Ref(MemObject):
+        def __init__(self, addr, deepness=0):
+            super(StringCache.Ref, self).__init__(addr, deepness)
+            self.entryAddr = idc.Qword(addr + StringCache.Ref.Offset.Entry.value)
+            
+            if self.entryAddr == 0:
+                self.entry = NullObject()
+            else:
+                if deepness >= max_deepness:
+                    self.entry = self.entryAddr
+                else:
+                    self.entry = StringCache.Entry(self.entryAddr, deepness + 1)
+            
+        def __repr__(self):
+            return "<StringCache::Ref at 0x{:X}, Entry: 0x{:X}>".format(self.addr, self.entryAddr)
+
+        def getCStr(self):
+            eaOrErrStr = self.getCStrAddrOrError()
+            if isinstance(eaOrErrStr, basestring):
+                return eaOrErrStr
+            return idc.GetString(eaOrErrStr)
+
+        def getCStrAddrOrError(self):
+            if type(self.entry) == StringCache.Entry:
+                return self.entry.getCStrAddr()
+            
+            if self.deepness >= max_deepness:
+                raise DeepnessExceededError()
+            else:
+                return StringCache.Entry(self.entryAddr, self.deepness).getCStrAddr()
+
         class Offset(Enum):
             Entry = 0
 
-BSFixedString = StringCache.Entry
+class BSFixedString(StringCache.Ref):
+    def __init__(self, addr, deepness=0):
+        super(BSFixedString, self).__init__(addr, deepness)
+    
+    def __repr__(self):
+        value = None
+        try:
+            value = self.getCStr()
+        except:
+            if pdbg: traceback.print_exc()
+        if value is None:
+            value = "<unknown>"
+        entry = ConditionalFormat(self.entry)
+        return ("<BSFixedString at 0x{:X}, entry: " + entry.format + ", value: {}>").format(self.addr, entry.repr, value)
+
+class TESFullname(MemObject):
+    def __init__(self, addr, deepness=0):
+        super(TESFullname, self).__init__(addr, deepness)
+        self.nameAddr = addr + TESFullName.Offset.Name.value
+
+        if deepness >= max_deepness:
+            self.name = self.nameAddr
+        else:
+            self.name = BSFixedString(self.nameAddr)
+
+    def __repr__(self):
+        name = None
+        if type(self.name) == BSFixedString:
+            try:
+                name = self.name.getCStr()
+            except:
+                if pdbg: traceback.print_exc()
+                name = "<unknown>"
+
+        return "<TESFullname at 0x{:X}, name: {}>".format(self.addr, name)
+
+    class Offset(Enum):
+        BSFixedString = 0x8
 
 class ExtraTextDisplayData(BSExtraData):
     def __init__(self, addr, deepness = 0):
@@ -401,3 +499,25 @@ class TESObjectREFR(TESForm):
 
     class Offset(Enum):
         InventoryList = 0xF8
+    
+class BGSKeyword(TESForm):
+    def __init__(self, addr, deepness=0):
+        super(BGSKeyword, self).__init__(addr, deepness)
+
+        self.keywordAddr = addr + BGSKeyword.Offset.BSFixedString.value
+
+        if (deepness >= max_deepness):
+            self.keyword = self.keywordAddr
+        else:
+            self.keyword = BSFixedString(self.keywordAddr, deepness + 1)
+
+    def __repr__(self):
+        try:
+            keyword = ConditionalFormat(self.keyword)
+            return ("<BGSKeyword at 0x{:X}, value: " + keyword.format + ">").format(self.addr, keyword.repr)
+        except Exception as e:
+            traceback.print_exc()
+        return ("<BGSKeyword at 0x{:X}, value: <unkown>>").format(self.addr)
+    
+    class Offset(Enum):
+        BSFixedString = 0x20

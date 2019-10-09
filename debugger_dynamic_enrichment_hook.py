@@ -8,7 +8,7 @@ idaapi.require('arch64')
 from DDE.Analysers.AnalyserBase import AnalyserBase
 from DDE.Analysers.TESObjectAnalyser import TESObjectAnalyser
 from DDE.Analysers.VFTableAnalyser import VFTableAnalyser
-from arch64 import x64RegCommonList
+from arch64 import x64RegCommonList, x64Regs
 
 pdbg = False
 pvrb = False
@@ -58,7 +58,7 @@ def scanRegisters():
     if pvrb: print("scanning...")
     for reg in x64RegCommonList:
         scan_register(reg)
-    print("scan completed.")
+    print("scan completed at RIP=0x{:X}.".format(idc.GetRegValue(x64Regs.RIP.value)))
 
 class MyDbgHook(idaapi.DBG_Hooks):
     """ Own debug hook class that implements the callback functions """

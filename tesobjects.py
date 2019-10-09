@@ -141,12 +141,9 @@ class StringCache(MemObject):
             return "<StringCache::Ref at 0x{:X}, Entry: 0x{:X}>".format(self.addr, self.entryAddr)
 
         def getCStr(self):
-            eaOrErrStr = self.getCStrAddrOrError()
-            if isinstance(eaOrErrStr, basestring):
-                return eaOrErrStr
-            return idc.GetString(eaOrErrStr)
+            return idc.GetString(self.getCStrAddr())
 
-        def getCStrAddrOrError(self):
+        def getCStrAddr(self):
             if type(self.entry) == StringCache.Entry:
                 return self.entry.getCStrAddr()
             

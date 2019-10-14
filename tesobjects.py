@@ -458,6 +458,42 @@ class TArray(MemObject):
         Capacity = 0x8
         Count = 0x10
 
+class InventoryInterface(MemObject):
+    def __init__(self, addr, deepness=0):
+        super(InventoryInterface, self).__init__(addr, deepness)
+        self.itemsAddr = self.addr + InventoryInterface.Offset.Items.value
+        
+        if (deepness >= max_deepness):
+            self.Items = self.itemsAddr
+        else:
+            self.Items = TArray(self.itemsAddr, InventoryInterface.Entry, InventoryInterface.Entry.Size, deepness + 1)
+    
+    def __repr__(self):
+        return "<InventoryInterface at 0x{:X}, items: 0x{:X}>".format(self.addr, self.itemsAddr)
+    
+    class Entry(MemObject):
+        Size = 0xC
+        def __init__(self, addr, deepness=0):
+            super(InventoryInterface.Entry, self).__init__(addr, deepness)
+            self.handleId = idc.Dword(self.addr + InventoryInterface.Entry.Offset.HandleId.value)
+            self.ownerHandle = idc.Dword(self.addr + InventoryInterface.Entry.Offset.OwnerHandle.value)
+            self.itemPosition = idc.Word(self.addr + InventoryInterface.Entry.Offset.ItemPosition.value)
+
+        class Offset(Enum):
+            HandleId =      0x0   # 0x4
+            OwnerHandle =   0x4   # 0x4
+            ItemPosition =  0x8   # 0x2
+            UnkA0        =  0x10  # 0x2
+        
+        def __repr__(self):
+            return "<InventoryInterface::Entry at 0x{:X}, handleId: 0x{:X}, ownerHandle: 0x{:X}, itemPos: {}>".format(self.addr, self.handleId, self.ownerHandle, self.itemPosition)
+    
+    class Offset(Enum):
+        Unk00 =                             0x0     # 0x8
+        CountChangedEventDispatcher =       0x8     #
+        FavoriteChangedEventDispatcher =    0x60    #
+        Items =                             0xB8    # tArray<InventoryInterface.Entry>
+
 class BGSInventoryList(MemObject):
     def __init__(self, addr, deepness = 0):
         super(BGSInventoryList, self).__init__(addr, deepness)

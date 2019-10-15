@@ -4,10 +4,12 @@ import idaapi
 idaapi.require('.AnalyserBase', 'DDE.Analysers')
 idaapi.require('.TESObjectAnalyser', 'DDE.Analysers')
 idaapi.require('.VFTableAnalyser', 'DDE.Analysers')
+idaapi.require('.FuncAnalyser', 'DDE.Analysers')
 idaapi.require('arch64')
 from DDE.Analysers.AnalyserBase import AnalyserBase
 from DDE.Analysers.TESObjectAnalyser import TESObjectAnalyser
 from DDE.Analysers.VFTableAnalyser import VFTableAnalyser
+from DDE.Analysers.FuncAnalyser import FuncAnalyser
 from arch64 import x64RegCommonList, x64Regs
 
 pdbg = False
@@ -18,7 +20,7 @@ def scan_register(reg_str_name):
     if pdbg: print("Reg scan: %s" % (reg_str_name))
     # TODO: iterate over scanners
     # scanners = AnalyserBase.__subclasses__()
-    scanners = [TESObjectAnalyser(), VFTableAnalyser()]
+    scanners = [FuncAnalyser(), TESObjectAnalyser(), VFTableAnalyser()]
     if pvrb: print("Found %s scanners." % (len(scanners)))
 
     for scanner in scanners:

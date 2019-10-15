@@ -19,11 +19,15 @@ Known limitations:
 1. Works only on x64 platforms and only helpful with MSVC++
 2. Very limited support of Fallout 4
 
+## Function Analysis Examples
+
+![](./resources/func-analyser-examples/Example-Analysis-Func.png)
+
 ## TES Objects Analysis Examples
 
 BSFixedString:
 
-![BSFixedString Example](resources\tes-analyser-examples\Example-Analysis-BSFixedString.png)
+![](./resources/tes-analyser-examples/Example-Analysis-BSFixedString.png)
 
 ## Scripts description
 

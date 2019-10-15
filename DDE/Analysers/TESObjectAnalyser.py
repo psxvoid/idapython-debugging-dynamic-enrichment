@@ -3,7 +3,7 @@ import idaapi
 
 import traceback
 
-from tesobjects import BGSInventoryItem, TESObjectREFR, TESForm, TArray
+from tesobjects import BGSInventoryItem, TESObjectREFR, TESForm, TArray, BSFixedString
 from DDE.RTTI.msvcrt.descriptors import VFTable, hasChildrenOfType
 from DDE.IDAHelpers.timeout import exit_after
 
@@ -21,6 +21,16 @@ class TESObjectAnalyser(AnalyserBase):
             tArray = TArray(addr)
             if tArray.count > 0 and tArray.capacity > 0 and tArray.count < tArray.capacity and tArray.count <= 10000:
                 self.getScanMessage = repr(tArray)
+                return True
+        except:
+            if pdbg: traceback.print_exc()
+
+        try:
+            # BSFixedString
+            fixedString = BSFixedString(addr)
+            cstr = fixedString.getCStr()
+            if (len(cstr) > 1):
+                self.scanMessage = repr(fixedString)
                 return True
         except:
             if pdbg: traceback.print_exc()

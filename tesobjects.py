@@ -478,15 +478,16 @@ class InventoryInterface(MemObject):
             self.handleId = idc.Dword(self.addr + InventoryInterface.Entry.Offset.HandleId.value)
             self.ownerHandle = idc.Dword(self.addr + InventoryInterface.Entry.Offset.OwnerHandle.value)
             self.itemPosition = idc.Word(self.addr + InventoryInterface.Entry.Offset.ItemPosition.value)
+            self.count = idc.Word(self.addr + InventoryInterface.Entry.Offset.Count.value)
 
         class Offset(Enum):
-            HandleId =      0x0   # 0x4
-            OwnerHandle =   0x4   # 0x4
-            ItemPosition =  0x8   # 0x2
-            UnkA0        =  0x10  # 0x2
+            HandleId =      0x0 # 0x4
+            OwnerHandle =   0x4 # 0x4
+            ItemPosition =  0x8 # 0x2
+            Count        =  0xA # 0x2
         
         def __repr__(self):
-            return "<InventoryInterface::Entry at 0x{:X}, handleId: 0x{:X}, ownerHandle: 0x{:X}, itemPos: {}>".format(self.addr, self.handleId, self.ownerHandle, self.itemPosition)
+            return "<InventoryInterface::Entry at 0x{:X}, handleId: 0x{:X}, ownerHandle: 0x{:X}, itemPos: {}, count: {}>".format(self.addr, self.handleId, self.ownerHandle, self.itemPosition, self.count)
     
     class Offset(Enum):
         Unk00 =                             0x0     # 0x8

@@ -26,16 +26,6 @@ class TESObjectAnalyser(AnalyserBase):
             if pdbg: traceback.print_exc()
 
         try:
-            # BSFixedString
-            fixedString = BSFixedString(addr)
-            cstr = fixedString.getCStr()
-            if (len(cstr) > 1):
-                self.scanMessage = repr(fixedString)
-                return True
-        except:
-            if pdbg: traceback.print_exc()
-
-        try:
             # BGSInventoryItem
             inventoryItem = BGSInventoryItem(addr)
             formVFTable = inventoryItem.form.getVFTable()
@@ -73,6 +63,16 @@ class TESObjectAnalyser(AnalyserBase):
 
             if (hasTESForm):
                 self.scanMessage = repr(tesForm)
+                return True
+        except:
+            if pdbg: traceback.print_exc()
+        
+        try:
+            # BSFixedString
+            fixedString = BSFixedString(addr)
+            cstr = fixedString.getCStr()
+            if (len(cstr) > 1):
+                self.scanMessage = repr(fixedString)
                 return True
         except:
             if pdbg: traceback.print_exc()

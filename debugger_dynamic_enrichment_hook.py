@@ -1,3 +1,4 @@
+import traceback
 import idc
 import idaapi
 
@@ -15,46 +16,84 @@ from arch64 import x64RegCommonList, x64Regs
 pdbg = False
 pvrb = False
 
+def filter_results(override_list, results):
+    # process overriden_by_all list
+    if (len(results) > 1):
+        results = [result for result in results if not (type(result) in override_list["overriden_by_all"])]
+    
+
+    # process overriden_by list    
+    filteredResults = []
+    resultTypes = [type(t) for t in results]
+
+    for result in results:
+        replacementRequested = False
+        for toOverride, overridenBy in override_list["overriden_by"].items():
+            if (type(result) == toOverride):
+                for replacement in overridenBy:
+                    if replacement in resultTypes:
+                        replacementRequested = True
+                        break
+            else:
+                continue # only executed if the inner loop did NOT break
+            break # only executed if the inner loop DID break
+        if not replacementRequested: filteredResults.append(result)
+    
+    return filteredResults
+
+def scan_value(scanners, value):
+    results = []
+    for scanner in scanners:
+        try:
+            results = results + scanner.getMatches(value)
+        except Exception as e:
+            if pdbg: print(e)
+    return results
+
+def print_results(formatStr, results):
+    for result in results:
+        print(formatStr.format(repr(result)))
+
 def scan_register(reg_str_name):
     regValue = idc.GetRegValue(reg_str_name)
     if pdbg: print("Reg scan: %s" % (reg_str_name))
     # TODO: iterate over scanners
     # scanners = AnalyserBase.__subclasses__()
-    scanners = [FuncAnalyser(), TESObjectAnalyser(), VFTableAnalyser()]
+    scanners = [TESObjectAnalyser(), VFTableAnalyser(), FuncAnalyser()]
     if pvrb: print("Found %s scanners." % (len(scanners)))
 
+    # build override list:
+    override_list = {
+        "overriden_by": {},
+        "overriden_by_all": [],
+        "overrides_all": []
+    }
+
     for scanner in scanners:
-        if pdbg: print("Reg Value: 0x%X" % (regValue))
-        try:
-            if scanner.getMatch(regValue):
-                print("%s is %s" % (reg_str_name.upper(), scanner.getScanMessage()))
-                return
-        except Exception as e:
-            if pdbg: print(e)
-            pass
+        override_list["overriden_by"].update(scanner.override_list["horizontal"]["overriden_by"])                                         # dict
+        override_list["overriden_by_all"] = override_list["overriden_by_all"] + scanner.override_list["horizontal"]["overriden_by_all"]   # list
+        override_list["overrides_all"] = override_list["overrides_all"] + scanner.override_list["horizontal"]["overrides_all"]            # list
 
-        if pdbg: print("scanning ptr..")
+    # scan registers
+    results = scan_value(scanners, regValue)
+    results = filter_results(override_list, results)
+    print_results("{} is ".format(reg_str_name.upper()) + "{}", results)
 
-        ptr = idc.Qword(regValue)
-        if pdbg: print("PTR0: 0x%X" % (ptr))
+    if pdbg: print("scanning ptr..")
 
-        try:
-            if scanner.getMatch(ptr):
-                print("%s points to 0x%X -> %s" % (reg_str_name.upper(), ptr, scanner.getScanMessage()))
-                return
-        except Exception as e:
-            if pdbg: print(e)
-            pass
+    ptr = idc.Qword(regValue)
+    if pdbg: print("PTR0: 0x%X" % (ptr))
 
-        ptrPtr = idc.Qword(ptr)
-        if pdbg: print("PTR1: 0x%X" % (ptrPtr))
+    results = scan_value(scanners, ptr)
+    results = filter_results(override_list, results)
+    print_results("{} points to ".format(reg_str_name.upper()) + "{}", results)
 
-        try:
-            if scanner.getMatch(ptrPtr):
-                print("%s points to 0x%X -> 0x%x -> %s" % (reg_str_name.upper(), ptr, ptrPtr, scanner.getScanMessage()))
-                return
-        except:
-            pass
+    ptrPtr = idc.Qword(ptr)
+    if pdbg: print("PTR1: 0x%X" % (ptrPtr))
+    
+    results = scan_value(scanners, ptrPtr)
+    results = filter_results(override_list, results)
+    print_results("{} points to 0x{:X} -> ".format(reg_str_name.upper(), ptr) + "{}", results)
 
 def scanRegisters():
     if pvrb: print("scanning...")
@@ -69,11 +108,11 @@ class MyDbgHook(idaapi.DBG_Hooks):
         super(MyDbgHook, self).__init__(*args, **kwargs)
         self.isInstalled = False
 
-    def scan(self):
-        print('Manual scan initiated...')
+    def scan(self, manual = True):
+        if manual: print('Manual scan initiated...')
         scanRegisters()
-        print('Manual scan completed.')
-
+        if manual: print('Manual scan completed.')
+    
     def hook(self):
         if self.isInstalled:
             print("Debugger hook is already installed.")
@@ -114,7 +153,7 @@ class MyDbgHook(idaapi.DBG_Hooks):
 
     def dbg_bpt(self, tid, ea):
         if pvrb: print("Breakpoint.")
-        scanRegisters()
+        self.scan()
         return 0
 
     def dbg_suspend_process(self):
@@ -128,13 +167,13 @@ class MyDbgHook(idaapi.DBG_Hooks):
 
     def dbg_step_into(self):
         if pvrb: print("Step into.")
-        scanRegisters()
+        self.scan()
 
     def dbg_run_to(self, pid, tid=0, ea=0):
         if pvrb: print("Run to.")
-        scanRegisters()
+        self.scan()
         return
 
     def dbg_step_over(self):
         if pvrb: print("Step over.")
-        scanRegisters()
+        self.scan()

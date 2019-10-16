@@ -9,15 +9,17 @@ class VFTableAnalyser(AnalyserBase):
     def __init__(self, *args, **kwargs):
         super(VFTableAnalyser, self).__init__(*args, **kwargs)
     
-    def getMatch(self, addr):
+    def getMatches(self, addr):
+        results = []
         try:
             vftable = VFTable(addr)
-            name = vftable.RTTICompleteObjectLocator.RTTITypeDescriptor.name
+            typeDescriptor = vftable.RTTICompleteObjectLocator.RTTITypeDescriptor
+            name = typeDescriptor.name
             if (name is None) or (len(name) <= 0):
-                return False
+                pass
             else:
-                self.scanMessage = repr(vftable.RTTICompleteObjectLocator.RTTITypeDescriptor)
-                return True
+                results.append(typeDescriptor)
         except Exception as e:
             if pdbg: traceback.print_exc()
-            return False
+        
+        return results

@@ -9,19 +9,32 @@ from DDE.IDAHelpers.timeout import exit_after
 
 from DDE.Analysers.AnalyserBase import AnalyserBase
 
+from DDE.IDAHelpers.wrappers.idafunc_func_t import IDAFunc
+
 pdbg = False
 
 class TESObjectAnalyser(AnalyserBase):
+    override_list = {
+        "horizontal": {
+            "overriden_by": {
+                IDAFunc: [VFTable],
+                TESForm: [TESObjectREFR]
+            },
+            "overriden_by_all": [BSFixedString],
+            "overrides_all": [],
+        }
+    }
+
     def __init__(self, *args, **kwargs):
         super(TESObjectAnalyser, self).__init__(*args, **kwargs)
     
     @exit_after(2)
-    def getMatch(self, addr):
+    def getMatches(self, addr):
+        results = []
         try:
             tArray = TArray(addr)
             if tArray.count > 0 and tArray.capacity > 0 and tArray.count < tArray.capacity and tArray.count <= 10000:
-                self.getScanMessage = repr(tArray)
-                return True
+                results.append(tArray)
         except:
             if pdbg: traceback.print_exc()
 
@@ -34,8 +47,7 @@ class TESObjectAnalyser(AnalyserBase):
             hasTESForm = hasChildrenOfType(formVFTable.RTTICompleteObjectLocator.RTTIClassHierarchyDescriptor, type_name)
 
             if hasTESForm and inventoryItem.stack.count > 0 and inventoryItem.stack.count < 20000:
-                self.scanMessage = repr(inventoryItem)
-                return True
+                results.append(inventoryItem)
         except:
             if pdbg: traceback.print_exc()
 
@@ -48,8 +60,7 @@ class TESObjectAnalyser(AnalyserBase):
             hasTESObjectREFRSubClass = hasChildrenOfType(vftable.RTTICompleteObjectLocator.RTTIClassHierarchyDescriptor, type_name)
 
             if isTESObjectREFRName or hasTESObjectREFRSubClass:
-                self.scanMessage = repr(TESObjectREFR(addr))
-                return True
+                results.append(TESObjectREFR(addr))
         except Exception as e:
             if pdbg: traceback.print_exc()
 
@@ -62,8 +73,7 @@ class TESObjectAnalyser(AnalyserBase):
             hasTESForm = hasChildrenOfType(vftable.RTTICompleteObjectLocator.RTTIClassHierarchyDescriptor, type_name)
 
             if (hasTESForm):
-                self.scanMessage = repr(tesForm)
-                return True
+                results.append(tesForm)
         except:
             if pdbg: traceback.print_exc()
         
@@ -72,9 +82,8 @@ class TESObjectAnalyser(AnalyserBase):
             fixedString = BSFixedString(addr)
             cstr = fixedString.getCStr()
             if (len(cstr) > 1):
-                self.scanMessage = repr(fixedString)
-                return True
+                results.append(fixedString)
         except:
-            if pdbg: traceback.print_exc()
+            if pdbg: traceback.print_exc()            
 
-        return False
+        return results

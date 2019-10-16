@@ -16,7 +16,7 @@ from arch64 import x64RegCommonList, x64Regs
 pdbg = False
 pvrb = False
 
-def filter_results(override_list, results):
+def filter_results(override_list, results, prevResults = []):
     # process overriden_by_all list
     if (len(results) > 1):
         results = [result for result in results if not (type(result) in override_list["overriden_by_all"])]
@@ -24,20 +24,20 @@ def filter_results(override_list, results):
 
     # process overriden_by list    
     filteredResults = []
-    resultTypes = [type(t) for t in results]
+    resultTypes = [type(t) for t in results + prevResults]
 
-    for result in results:
+    for result in results + prevResults:
         replacementRequested = False
-        for toOverride, overridenBy in override_list["overriden_by"].items():
+        for toOverride, overrideBy in override_list["overriden_by"].items():
             if (type(result) == toOverride):
-                for replacement in overridenBy:
+                for replacement in overrideBy:
                     if replacement in resultTypes:
                         replacementRequested = True
                         break
             else:
                 continue # only executed if the inner loop did NOT break
             break # only executed if the inner loop DID break
-        if not replacementRequested: filteredResults.append(result)
+        if (not replacementRequested) and (result in results): filteredResults.append(result)
     
     return filteredResults
 
@@ -84,15 +84,17 @@ def scan_register(reg_str_name):
     ptr = idc.Qword(regValue)
     if pdbg: print("PTR0: 0x%X" % (ptr))
 
+    prevResults = results
     results = scan_value(scanners, ptr)
-    results = filter_results(override_list, results)
+    results = filter_results(override_list, results, prevResults)
     print_results("{} points to ".format(reg_str_name.upper()) + "{}", results)
 
     ptrPtr = idc.Qword(ptr)
     if pdbg: print("PTR1: 0x%X" % (ptrPtr))
     
+    prevResults = prevResults + results
     results = scan_value(scanners, ptrPtr)
-    results = filter_results(override_list, results)
+    results = filter_results(override_list, results, prevResults)
     print_results("{} points to 0x{:X} -> ".format(reg_str_name.upper(), ptr) + "{}", results)
 
 def scanRegisters():

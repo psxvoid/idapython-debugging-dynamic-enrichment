@@ -4,8 +4,10 @@ import idaapi
 import traceback
 
 from tesobjects import BGSInventoryItem, TESObjectREFR, TESForm, TArray, BSFixedString
-from DDE.RTTI.msvcrt.descriptors import VFTable, hasChildrenOfType
+
+from DDE.RTTI.msvcrt.descriptors import VFTable, RTTITypeDescriptor, hasChildrenOfType
 from DDE.IDAHelpers.timeout import exit_after
+from DDE.IDAHelpers.adressing import isInMemoryRange
 
 from DDE.Analysers.AnalyserBase import AnalyserBase
 
@@ -17,8 +19,9 @@ class TESObjectAnalyser(AnalyserBase):
     override_list = {
         "horizontal": {
             "overriden_by": {
-                IDAFunc: [VFTable],
-                TESForm: [TESObjectREFR]
+                IDAFunc: [VFTable, TESObjectREFR, RTTITypeDescriptor],
+                RTTITypeDescriptor: [TESForm, TESObjectREFR, BGSInventoryItem],
+                TESForm: [TESObjectREFR, BGSInventoryItem],
             },
             "overriden_by_all": [BSFixedString],
             "overrides_all": [],
@@ -31,9 +34,14 @@ class TESObjectAnalyser(AnalyserBase):
     @exit_after(2)
     def getMatches(self, addr):
         results = []
+
+        if not isInMemoryRange(addr):
+            return results
+
         try:
+            # tArray
             tArray = TArray(addr)
-            if tArray.count > 0 and tArray.capacity > 0 and tArray.count < tArray.capacity and tArray.count <= 10000:
+            if tArray.count > 0 and tArray.capacity > 0 and tArray.count < tArray.capacity and tArray.count <= 10000 and isInMemoryRange(tArray.entriesAddr):
                 results.append(tArray)
         except:
             if pdbg: traceback.print_exc()

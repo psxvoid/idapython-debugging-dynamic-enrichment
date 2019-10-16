@@ -6,7 +6,7 @@ from DDE.Common.memobject import MemObject
 from DDE.IDAHelpers.rva import RVA
 
 ptrSize = 8
-max_deepness = 10
+max_deepness = 15
 max_hierarchy_deepness = 45
 
 class VFTable(MemObject):

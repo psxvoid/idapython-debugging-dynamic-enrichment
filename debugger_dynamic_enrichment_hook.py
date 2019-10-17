@@ -6,11 +6,13 @@ idaapi.require('.AnalyserBase', 'DDE.Analysers')
 idaapi.require('.TESObjectAnalyser', 'DDE.Analysers')
 idaapi.require('.VFTableAnalyser', 'DDE.Analysers')
 idaapi.require('.FuncAnalyser', 'DDE.Analysers')
+idaapi.require('.StringAnalyser', 'DDE.Analysers')
 idaapi.require('arch64')
 from DDE.Analysers.AnalyserBase import AnalyserBase
 from DDE.Analysers.TESObjectAnalyser import TESObjectAnalyser
 from DDE.Analysers.VFTableAnalyser import VFTableAnalyser
 from DDE.Analysers.FuncAnalyser import FuncAnalyser
+from DDE.Analysers.StringAnalyser import StringAnalyser
 from arch64 import x64RegCommonList, x64Regs
 
 pdbg = False
@@ -59,7 +61,7 @@ def scan_register(reg_str_name):
     if pdbg: print("Reg scan: %s" % (reg_str_name))
     # TODO: iterate over scanners
     # scanners = AnalyserBase.__subclasses__()
-    scanners = [TESObjectAnalyser(), VFTableAnalyser(), FuncAnalyser()]
+    scanners = [TESObjectAnalyser(), VFTableAnalyser(), FuncAnalyser(), StringAnalyser()]
     if pvrb: print("Found %s scanners." % (len(scanners)))
 
     # build override list:
@@ -97,11 +99,18 @@ def scan_register(reg_str_name):
     results = filter_results(override_list, results, prevResults)
     print_results("{} points to 0x{:X} -> ".format(reg_str_name.upper(), ptr) + "{}", results)
 
-def scanRegisters():
-    if pvrb: print("scanning...")
+def scanRegisters(manual = False):
+    messagePrefix = "Manual scan" if manual else "Scan"
+    scanInitiatedMessage = messagePrefix + " initiated." 
+    print(scanInitiatedMessage)
+
+    print("----------------------------------------------------")
     for reg in x64RegCommonList:
         scan_register(reg)
-    print("scan completed at RIP=0x{:X}.".format(idc.GetRegValue(x64Regs.RIP.value)))
+    print("----------------------------------------------------")
+    ripValue = idc.GetRegValue(x64Regs.RIP.value)
+    scanCompleteMessage = (messagePrefix + " completed at RIP=0x{:X}").format(ripValue)
+    print(scanCompleteMessage)
 
 class MyDbgHook(idaapi.DBG_Hooks):
     """ Own debug hook class that implements the callback functions """
@@ -110,10 +119,8 @@ class MyDbgHook(idaapi.DBG_Hooks):
         super(MyDbgHook, self).__init__(*args, **kwargs)
         self.isInstalled = False
 
-    def scan(self, manual = True):
-        if manual: print('Manual scan initiated...')
-        scanRegisters()
-        if manual: print('Manual scan completed.')
+    def scan(self):
+        scanRegisters(True)
     
     def hook(self):
         if self.isInstalled:
@@ -155,7 +162,7 @@ class MyDbgHook(idaapi.DBG_Hooks):
 
     def dbg_bpt(self, tid, ea):
         if pvrb: print("Breakpoint.")
-        self.scan(False)
+        scanRegisters()
         return 0
 
     def dbg_suspend_process(self):
@@ -169,13 +176,13 @@ class MyDbgHook(idaapi.DBG_Hooks):
 
     def dbg_step_into(self):
         if pvrb: print("Step into.")
-        self.scan(False)
+        scanRegisters()
 
     def dbg_run_to(self, pid, tid=0, ea=0):
         if pvrb: print("Run to.")
-        self.scan(False)
+        scanRegisters()
         return
 
     def dbg_step_over(self):
         if pvrb: print("Step over.")
-        self.scan(False)
+        scanRegisters()

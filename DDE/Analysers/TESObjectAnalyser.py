@@ -21,7 +21,7 @@ class TESObjectAnalyser(AnalyserBase):
             "overriden_by": {
                 IDAFunc: [VFTable, TESObjectREFR, RTTITypeDescriptor],
                 RTTITypeDescriptor: [TESForm, TESObjectREFR, BGSInventoryItem],
-                TESForm: [TESObjectREFR, BGSInventoryItem],
+                TESForm: [TESObjectREFR, BGSInventoryItem]
             },
             "overriden_by_all": [BSFixedString],
             "overrides_all": [],
@@ -89,7 +89,7 @@ class TESObjectAnalyser(AnalyserBase):
             # BSFixedString
             fixedString = BSFixedString(addr)
             cstr = fixedString.getCStr()
-            if (len(cstr) > 1):
+            if (len(cstr) > 4):
                 results.append(fixedString)
         except:
             if pdbg: traceback.print_exc()            

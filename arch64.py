@@ -1,6 +1,7 @@
 from aenum import Enum, Constant
 
 class x64Regs(Enum):
+    _order_ = 'RAX RBX RCX RDX RSI RDI RBP RSP R8 R9 R10 R11 R12 R13 R14 R15 RIP'
     RAX = 'RAX'
     RBX = 'RBX'
     RCX = 'RCX'
@@ -21,6 +22,7 @@ class x64Regs(Enum):
     RIP = 'RIP'
 
 class x32Regs(Enum):
+    _order_ = 'EAX EBX ECX EDX ESI EDI EBP ESP R8d R9d R10d R11d R12d R13d R14d R15d'
     EAX = 'eax'
     EBX = 'ebx'
     ECX = 'ecx'
@@ -39,6 +41,7 @@ class x32Regs(Enum):
     R15d = 'r15d'
 
 class x16Regs(Enum):
+    _order_ = 'AX BX CX DX SI DI BP SP R8w R9w R10w R11w R12w R13w R14w R15w'
     AX = 'ax'
     BX = 'bx'
     CX = 'cx'
@@ -57,6 +60,7 @@ class x16Regs(Enum):
     R15w = 'r15w'
 
 class x8Regs(Enum):
+    _order_ = 'AL BL CL DL SIL DIL BPL SPL R8b R9b R10b R11b R12b R13b R14b R15b'
     AL = 'al'
     BL = 'bl'
     CL = 'cl'

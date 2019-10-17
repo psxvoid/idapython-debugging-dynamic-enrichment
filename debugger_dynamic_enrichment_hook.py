@@ -155,7 +155,7 @@ class MyDbgHook(idaapi.DBG_Hooks):
 
     def dbg_bpt(self, tid, ea):
         if pvrb: print("Breakpoint.")
-        self.scan()
+        self.scan(False)
         return 0
 
     def dbg_suspend_process(self):
@@ -169,13 +169,13 @@ class MyDbgHook(idaapi.DBG_Hooks):
 
     def dbg_step_into(self):
         if pvrb: print("Step into.")
-        self.scan()
+        self.scan(False)
 
     def dbg_run_to(self, pid, tid=0, ea=0):
         if pvrb: print("Run to.")
-        self.scan()
+        self.scan(False)
         return
 
     def dbg_step_over(self):
         if pvrb: print("Step over.")
-        self.scan()
+        self.scan(False)

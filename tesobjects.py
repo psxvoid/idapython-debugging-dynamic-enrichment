@@ -233,9 +233,15 @@ class ExtraDataList(MemObject):
             return []
         return self.ExtraData.toArray()
 
-    def printExtraDataTypes(self):
+    def getExtraDataTypeNames(self):
+        result = []
         for extraData in self.toArray():
-            print(extraData.getTypeName())
+            result.append(extraData.getTypeName())
+        return result
+
+    def printExtraDataTypes(self):
+        for extraDataName in self.getExtraDataTypeNames():
+            print(extraDataName)
 
     def getExtraDataByType(self, extraDataType):
         # lock is skipped

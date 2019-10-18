@@ -105,13 +105,14 @@ And the ouput will look like:
 
 ### Function Analysis Examples
 
-![](./resources/func-analyser-examples/Example-Analysis-Func.png)
+![](./resources/readme/analyser-examples/func-analyser-examples/Example-Analysis-Func.png)
 
 ### TES Objects Analysis Examples
 
 BSFixedString:
 
-![](./resources/tes-analyser-examples/Example-Analysis-BSFixedString.png)
+![](./resources/readme/analyser-examples/tes-analyser-examples/Example-Analysis-BSFixedString.png)
+
 
 ## Scripts description
 
